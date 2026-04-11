@@ -371,6 +371,56 @@ section {
 
 .read-more:hover { opacity: 0.8; }
 
+/* ===== EXPERIENCE ===== */
+.exp-dot { background: var(--orange); box-shadow: 0 0 8px rgba(240,136,62,0.5); }
+
+.exp-card:hover { border-color: var(--orange); }
+
+.exp-meta {
+  font-size: 13px;
+  color: var(--muted);
+  margin-top: 2px;
+  margin-bottom: 0 !important;
+}
+
+.exp-meta i { font-size: 11px; }
+
+.exp-badge {
+  background: rgba(240,136,62,0.15);
+  color: var(--orange);
+  padding: 3px 10px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  align-self: flex-start;
+}
+
+.exp-list {
+  list-style: none;
+  margin: 12px 0 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.exp-list li {
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.65;
+  padding-left: 16px;
+  position: relative;
+}
+
+.exp-list li::before {
+  content: '▸';
+  position: absolute;
+  left: 0;
+  color: var(--orange);
+  font-size: 11px;
+  top: 2px;
+}
+
 /* ===== SKILLS ===== */
 .skills-grid {
   display: grid;
