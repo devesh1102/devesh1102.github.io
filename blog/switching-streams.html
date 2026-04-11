@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Switching Streams in 2 Weeks — Devesh Kumar</title>
+  <meta name="description" content="How I went from Azure infrastructure engineering to AI Copilot development in weeks — and what it taught me about learning under pressure."/>
+  <link rel="icon" href="../favicon.svg" type="image/svg+xml"/>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"/>
+  <link rel="stylesheet" href="blog.css"/>
+</head>
+<body>
+<nav>
+  <div class="nav-inner">
+    <a href="../index.html" class="nav-back"><i class="fas fa-arrow-left"></i> Back</a>
+    <span class="nav-logo">devesh1102.github.io</span>
+  </div>
+</nav>
+
+<article>
+  <span class="post-category">Career</span>
+  <h1 class="post-title">Switching Streams in 2 Weeks: From Azure Infrastructure to AI Copilot</h1>
+  <div class="post-meta">
+    <span><i class="fas fa-calendar"></i> Nov 2023</span>
+    <span><i class="fas fa-clock"></i> 5 min read</span>
+    <span><i class="fas fa-tag"></i> Learning · Career · AI</span>
+  </div>
+
+  <div class="post-content">
+
+    <p>For two years I'd been doing infrastructure and data platform work — IoT ingestion pipelines, ADX schema design, Bicep IaC, security hardening. I was comfortable. I knew the codebase deeply.</p>
+
+    <p>In late 2023 the team needed someone to take over the Copilot AI workstream at a critical moment. Copilot accuracy was stuck at 40% and Public Preview was weeks away. I was asked if I could step in.</p>
+
+    <p>I said yes. I had never worked on an LLM pipeline before.</p>
+
+    <h2>The First Week: Read Everything</h2>
+
+    <p>There was no time for a gentle ramp. My approach in week one was to read the entire Copilot Python codebase end-to-end before writing a single line.</p>
+
+    <p>I traced every step: how a user question became a prompt, how instructions and examples were retrieved from storage, how the prompt was assembled, how the KQL was generated, how it was validated, how errors were handled. I needed a complete mental model before I could make good decisions about what to change.</p>
+
+    <div class="callout insight">
+      <span class="callout-label">Approach</span>
+      When you're new to a codebase, resist the urge to start coding immediately. An hour reading beats a day of wrong assumptions.
+    </div>
+
+    <h2>The Second Week: Find the Real Failure Modes</h2>
+
+    <p>Armed with understanding, I ran the system against a set of test questions and catalogued every failure. Not abstractly — concretely. What exact query was generated? What validation error came back? What was the model trying to do?</p>
+
+    <p>Three patterns emerged quickly:</p>
+
+    <ul>
+      <li>Missing type casts on column references</li>
+      <li>No learning from previous failed attempts</li>
+      <li>Syntax mismatch between customer examples and internal query format</li>
+    </ul>
+
+    <p>Each was fixable. None required redesigning the whole pipeline. I started with the highest-impact one — typecast injection — and worked through the list.</p>
+
+    <h2>What Made the Switch Possible</h2>
+
+    <p>Looking back, a few things made this transition work:</p>
+
+    <h3>Infrastructure knowledge transferred directly</h3>
+    <p>I knew ADX, Cosmos DB, and the data model deeply from my previous work. The Copilot pipeline queried these same systems. Understanding the underlying data was a significant advantage — I could reason about why certain queries would fail based on the schema, not just the model output.</p>
+
+    <h3>Debugging skills are universal</h3>
+    <p>Good debugging — reproduce the problem, isolate the variable, form a hypothesis, test it — works the same whether you're debugging a null reference in C# or a failing KQL query from an LLM. The domain changes; the method doesn't.</p>
+
+    <h3>Treat the model like a system component</h3>
+    <p>I approached the LLM the same way I'd approach any other component in the pipeline: what are its inputs, what are its outputs, where are the failure modes, how do I instrument it? This framing was more useful than thinking of it as a magical black box.</p>
+
+    <h2>And Then Again: Frontend in 2025</h2>
+
+    <p>The same pattern repeated when I moved to the Power Automate Process Mining team in 2025. After 3+ years of backend C#/.NET work, I was now primarily in a React/TypeScript/Fluent UI codebase.</p>
+
+    <p>Same approach: read the codebase first, find the patterns, contribute incrementally, then start guiding others once you have depth. Within a few months I was unblocking teammates on frontend design questions and became one of the more experienced FE contributors on the team.</p>
+
+    <blockquote>"The way he ramped up on learning FE development, React and Fluent, to the way he progressed in supporting other developers in FE design and work, unblocking them and guiding them towards completion is highly commendable." — Manager feedback</blockquote>
+
+    <h2>What I'd Tell Someone in the Same Spot</h2>
+
+    <ul>
+      <li><strong>Read before you write.</strong> A complete mental model of the system is worth more than early code contributions that have to be refactored.</li>
+      <li><strong>Find the failure modes empirically.</strong> Don't guess what's broken. Run the system, observe the failures, then fix the actual problems.</li>
+      <li><strong>Your existing skills transfer more than you think.</strong> Domain knowledge changes. Problem-solving methodology doesn't.</li>
+      <li><strong>Say yes first, then figure out the rest.</strong> If you wait until you're fully qualified to take on something new, the opportunity will have passed.</li>
+    </ul>
+
+    <div class="tags">
+      <span>Career Growth</span><span>Learning</span><span>LLM</span><span>React</span><span>Azure</span><span>Engineering</span>
+    </div>
+  </div>
+
+  <div class="post-footer">
+    <a href="code-quality.html"><i class="fas fa-arrow-left"></i> Previous: Removing 1,152 Code Warnings</a>
+    <a href="../index.html">Back to home <i class="fas fa-arrow-right"></i></a>
+  </div>
+</article>
+</body>
+</html>

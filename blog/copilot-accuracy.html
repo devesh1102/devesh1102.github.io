@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>From 40% to 75%: Improving Copilot Query Accuracy — Devesh Kumar</title>
+  <meta name="description" content="How I switched streams from Azure Data Platform to AI Copilot and improved RAG pipeline query accuracy from 40% to 75%+ in weeks."/>
+  <link rel="icon" href="../favicon.svg" type="image/svg+xml"/>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"/>
+  <link rel="stylesheet" href="blog.css"/>
+</head>
+<body>
+<nav>
+  <div class="nav-inner">
+    <a href="../index.html" class="nav-back"><i class="fas fa-arrow-left"></i> Back</a>
+    <span class="nav-logo">devesh1102.github.io</span>
+  </div>
+</nav>
+
+<article>
+  <span class="post-category">Deep Dive</span>
+  <h1 class="post-title">From 40% to 75%: How I Improved Copilot Query Accuracy in Weeks</h1>
+  <div class="post-meta">
+    <span><i class="fas fa-calendar"></i> Nov 2023</span>
+    <span><i class="fas fa-clock"></i> 6 min read</span>
+    <span><i class="fas fa-tag"></i> LLM · Prompt Engineering · RAG</span>
+  </div>
+
+  <div class="post-content">
+
+    <p>In late 2023, I was asked to switch streams. My previous work had been squarely in infrastructure and data platform territory — ADX ingestion pipelines, Bicep IaC, security hardening. Now I was being handed the AI Copilot workstream, which was stuck at <strong>40% query accuracy</strong> with a Public Preview deadline closing in fast.</p>
+
+    <p>I had never worked on an LLM pipeline before.</p>
+
+    <h2>What the Pipeline Looked Like</h2>
+
+    <p>The Copilot system took a user's natural language question and turned it into a KQL query to run against the manufacturing knowledge graph. The pipeline was RAG-based: it retrieved relevant instructions and examples from storage, assembled a prompt, called Azure OpenAI, got back a KQL query, and executed it.</p>
+
+    <p>At 40% accuracy, 6 out of 10 queries were either failing to execute or returning wrong results. The deadline was weeks away. I needed to find and fix the real failure modes — fast.</p>
+
+    <h2>Diagnosing the Failures</h2>
+
+    <p>I started by running the Copilot against a set of test questions and studying every failure carefully. Three patterns emerged:</p>
+
+    <h3>Failure Mode 1: Missing Type Casts</h3>
+    <p>Copilot was generating KQL with column references but consistently forgetting to cast them to the correct type. A query that should have been <code>where tostring(Status) == "Active"</code> was being generated as <code>where Status == "Active"</code> — and failing silently or returning wrong results.</p>
+
+    <p><strong>Fix:</strong> Post-process the generated KQL and automatically inject typecasts for all columns based on their type definitions in the DTDL schema. The model didn't need to know the types — the system handled it.</p>
+
+    <h3>Failure Mode 2: No Learning from Previous Errors</h3>
+    <p>When a query failed validation, the next attempt started from scratch with the same prompt. The model had no idea what had gone wrong previously.</p>
+
+    <p><strong>Fix:</strong> Propagate previous validation errors into the next prompt. The model now sees: "Your previous query failed with error X — here it is, please fix it." This turned single-shot attempts into a self-correcting loop.</p>
+
+    <h3>Failure Mode 3: Customer Examples Were in the Wrong Syntax</h3>
+    <p>The pipeline used cipher-based KQL internally (more structured, easier for the LLM to handle) but customers registered examples in standard KQL. There was a mismatch — the model was getting confused by mixed syntax in its context.</p>
+
+    <p><strong>Fix:</strong> Build an automatic KQL-to-cipher-text converter that runs server-side when a customer registers an example. Customers write standard KQL, the system transparently stores and uses the cipher equivalent. Zero migration effort for customers, clean inputs for the model.</p>
+
+    <div class="callout insight">
+      <span class="callout-label">Design principle</span>
+      The model's job is reasoning, not syntax normalisation. Every inconsistency in the prompt that the model has to mentally resolve is a chance for error. Normalise inputs before they reach the model.
+    </div>
+
+    <h2>Other Improvements</h2>
+
+    <h3>Parallel Data Fetching</h3>
+    <p>The prompt assembly step was fetching instructions, examples, and aliases from Cosmos DB sequentially. Switched to parallel calls — reduced prompt assembly time significantly and made the pipeline more responsive.</p>
+
+    <h3>Inbuilt Jobs for Aliases and Instructions</h3>
+    <p>Wrote startup jobs to pre-register out-of-the-box aliases, instructions, and examples — so every new customer deployment started with a solid baseline that the model could rely on, rather than a blank slate.</p>
+
+    <h2>Results</h2>
+
+    <div class="metric-row">
+      <div class="metric">
+        <div class="metric-value">40%</div>
+        <div class="metric-label">Query accuracy before</div>
+      </div>
+      <div class="metric">
+        <div class="metric-value">75%+</div>
+        <div class="metric-label">Query accuracy after — consistently</div>
+      </div>
+    </div>
+
+    <div class="callout result">
+      <span class="callout-label">Manager feedback</span>
+      "Switch streams for accepting copilot work and delivering within a very short time." — "Devesh's velocity in delivery and his quick turnaround time in bringing tasks to completion with quality is top-notch."
+    </div>
+
+    <h2>What I Took Away</h2>
+
+    <ul>
+      <li><strong>Study the failures, not the architecture.</strong> I didn't spend time redesigning the whole pipeline — I ran it, looked at what was actually failing, and fixed those specific things. A lot of LLM "accuracy problems" are really just input-quality problems.</li>
+      <li><strong>Post-processing is underrated.</strong> You don't have to get the model to be perfect at everything. Some things are easier to fix deterministically after the model responds — like type casting — than to get right through prompt engineering.</li>
+      <li><strong>Give the model feedback.</strong> Propagating previous errors into the next prompt was one of the highest-impact changes. The model is trying to help you — tell it what went wrong.</li>
+    </ul>
+
+    <div class="tags">
+      <span>Azure OpenAI</span><span>RAG</span><span>KQL</span><span>Prompt Engineering</span><span>C#</span><span>Python</span><span>Cosmos DB</span>
+    </div>
+  </div>
+
+  <div class="post-footer">
+    <a href="openai-assistant.html"><i class="fas fa-arrow-left"></i> Previous: Shipping Azure OpenAI in Production</a>
+    <a href="code-quality.html">Next: Removing 1,152 Code Warnings <i class="fas fa-arrow-right"></i></a>
+  </div>
+</article>
+</body>
+</html>

@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Removing 1,152 Code Warnings — Devesh Kumar</title>
+  <meta name="description" content="How I eliminated 1,152 compiler warnings, enforced a 70% test coverage gate, and standardised exception handling — measurably reducing production errors."/>
+  <link rel="icon" href="../favicon.svg" type="image/svg+xml"/>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"/>
+  <link rel="stylesheet" href="blog.css"/>
+</head>
+<body>
+<nav>
+  <div class="nav-inner">
+    <a href="../index.html" class="nav-back"><i class="fas fa-arrow-left"></i> Back</a>
+    <span class="nav-logo">devesh1102.github.io</span>
+  </div>
+</nav>
+
+<article>
+  <span class="post-category">Engineering</span>
+  <h1 class="post-title">Removing 1,152 Code Warnings — and Making Sure They Never Come Back</h1>
+  <div class="post-meta">
+    <span><i class="fas fa-calendar"></i> 2022</span>
+    <span><i class="fas fa-clock"></i> 5 min read</span>
+    <span><i class="fas fa-tag"></i> Code Quality · CI/CD · .NET</span>
+  </div>
+
+  <div class="post-content">
+
+    <p>Compiler warnings are easy to ignore. They don't break the build. They don't cause immediate errors. They just sit there, accumulating quietly, until your codebase is full of them and nobody feels responsible for any individual one.</p>
+
+    <p>When I took a hard look at our codebase on the SKG team, we had <strong>1,152 of them</strong>.</p>
+
+    <h2>Why Warnings Are Actually a Problem</h2>
+
+    <p>The majority of our warnings were one of two types:</p>
+
+    <ul>
+      <li><strong>Null reference risks</strong> — places where C#'s null-safety analysis flagged a potential null dereference that hadn't been handled</li>
+      <li><strong>Unnecessary async keywords</strong> — methods marked <code>async</code> that weren't actually doing anything asynchronous, adding overhead and obscuring intent</li>
+    </ul>
+
+    <p>The null reference ones were the dangerous category. Each was a latent production failure waiting for the right runtime conditions to surface. And because there were 1,152 of them mixed in with benign ones, the signal was completely lost in noise — a new critical warning would just disappear into the list.</p>
+
+    <div class="callout warning">
+      <span class="callout-label">The real cost</span>
+      A warning-heavy codebase doesn't just carry technical debt — it trains engineers to ignore warnings entirely. When a genuinely dangerous warning appears, nobody notices.
+    </div>
+
+    <h2>The Fix: Three Parts</h2>
+
+    <h3>Part 1 — Eliminate All 1,152 Warnings</h3>
+    <p>I went through the codebase methodically, project by project. The null-reference warnings required proper null-handling — null checks, null-coalescing operators, or restructuring the logic to avoid nullable paths. The unnecessary async keywords were straightforward removals.</p>
+    <p>Not glamorous work. But methodical, and with a clear finish line.</p>
+
+    <h3>Part 2 — Make New Warnings Impossible to Merge</h3>
+    <p>Cleaning up 1,152 warnings means nothing if the next PR adds 10 more. I configured all projects in the solution to <strong>treat warnings as errors</strong>. From that point forward, any PR that introduced a new warning would fail to compile and fail the build — it simply couldn't be merged.</p>
+
+    <p>This was the important part. Fixing warnings once is a one-time activity. Making it structurally impossible to introduce them is a permanent property of the codebase.</p>
+
+    <h3>Part 3 — Enforce Test Coverage in CI</h3>
+    <p>While I was improving code quality, I also added a <strong>code coverage gate to the Azure DevOps pipeline</strong>: any PR that drops L0 (unit test) coverage below <strong>70%</strong> automatically fails.</p>
+
+    <p>This meant every line of code merged after the gate was introduced had meaningful test coverage. It changed the culture around testing — not through persuasion, but through the pipeline. If your code doesn't have tests, it doesn't merge. Simple.</p>
+
+    <h3>Part 4 — Standardise Exception Handling</h3>
+    <p>I also standardised HTTP exception handling across the entire codebase — all exceptions now resolve to a common format with consistent fields. This sounds minor but had real impact: debugging production issues became faster because every error response looked the same, and client teams could rely on a consistent error schema.</p>
+
+    <h2>Results</h2>
+
+    <div class="metric-row">
+      <div class="metric">
+        <div class="metric-value">1,152</div>
+        <div class="metric-label">Warnings eliminated</div>
+      </div>
+      <div class="metric">
+        <div class="metric-value">70%</div>
+        <div class="metric-label">L0 test coverage gate enforced in CI</div>
+      </div>
+      <div class="metric">
+        <div class="metric-value">0</div>
+        <div class="metric-label">Net-new warnings since the change</div>
+      </div>
+    </div>
+
+    <blockquote>"Your contributions are commendable, and your work has significantly improved the product quality and efficiency." — Manager feedback</blockquote>
+
+    <h2>What I Learned</h2>
+
+    <ul>
+      <li><strong>Fix the culture, not just the code.</strong> Removing the warnings was the easy part. The <em>warnings-as-errors</em> configuration was what actually changed the trajectory of the codebase. Structural enforcement beats manual discipline every time.</li>
+      <li><strong>CI gates are team policies made concrete.</strong> A coverage gate in the pipeline is more effective than a document saying "we value test coverage." The pipeline doesn't forget and doesn't make exceptions for tight deadlines.</li>
+      <li><strong>Do the unglamorous work.</strong> Nobody gets excited about a null-check cleanup PR. But unglamorous, systematic work that improves the foundation makes everything that comes after it easier and more reliable.</li>
+    </ul>
+
+    <div class="tags">
+      <span>C#</span><span>.NET</span><span>CI/CD</span><span>Azure DevOps</span><span>Code Quality</span><span>Testing</span>
+    </div>
+  </div>
+
+  <div class="post-footer">
+    <a href="copilot-accuracy.html"><i class="fas fa-arrow-left"></i> Previous: From 40% to 75% Accuracy</a>
+    <a href="switching-streams.html">Next: Switching Streams in 2 Weeks <i class="fas fa-arrow-right"></i></a>
+  </div>
+</article>
+</body>
+</html>

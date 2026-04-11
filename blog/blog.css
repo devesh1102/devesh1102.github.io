@@ -1,0 +1,152 @@
+/* Blog post shared styles */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg: #0d1117; --bg2: #161b22; --bg3: #21262d;
+  --border: #30363d; --text: #e6edf3; --muted: #8b949e;
+  --accent: #58a6ff; --accent2: #7c3aed;
+  --green: #3fb950; --purple: #a371f7; --orange: #f0883e;
+  --radius: 12px;
+}
+
+html { scroll-behavior: smooth; }
+body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--text); line-height: 1.7; font-size: 16px; }
+a { color: var(--accent); text-decoration: none; }
+a:hover { opacity: 0.8; }
+
+/* NAV */
+nav { position: sticky; top: 0; z-index: 100; background: rgba(13,17,23,0.9); backdrop-filter: blur(12px); border-bottom: 1px solid var(--border); }
+.nav-inner { max-width: 760px; margin: 0 auto; padding: 0 24px; height: 56px; display: flex; align-items: center; justify-content: space-between; }
+.nav-back { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 14px; font-weight: 500; }
+.nav-back:hover { color: var(--accent); opacity: 1; }
+.nav-logo { font-size: 14px; color: var(--muted); }
+
+/* ARTICLE */
+article { max-width: 760px; margin: 0 auto; padding: 56px 24px 80px; }
+
+.post-category {
+  display: inline-block;
+  background: rgba(163,113,247,0.15);
+  color: var(--purple);
+  padding: 4px 12px; border-radius: 20px;
+  font-size: 12px; font-weight: 600;
+  margin-bottom: 20px;
+}
+
+.post-title {
+  font-size: clamp(26px, 5vw, 40px);
+  font-weight: 700;
+  letter-spacing: -1px;
+  line-height: 1.2;
+  margin-bottom: 16px;
+}
+
+.post-meta {
+  display: flex; align-items: center; gap: 16px;
+  color: var(--muted); font-size: 14px;
+  margin-bottom: 40px;
+  padding-bottom: 32px;
+  border-bottom: 1px solid var(--border);
+}
+
+.post-meta i { font-size: 12px; }
+
+/* CONTENT */
+.post-content h2 {
+  font-size: 22px; font-weight: 700;
+  margin: 40px 0 14px;
+  color: var(--text);
+}
+
+.post-content h3 {
+  font-size: 17px; font-weight: 600;
+  margin: 28px 0 10px;
+  color: var(--text);
+}
+
+.post-content p { color: var(--muted); margin-bottom: 18px; line-height: 1.8; }
+
+.post-content strong { color: var(--text); }
+
+.post-content ul, .post-content ol {
+  color: var(--muted);
+  padding-left: 24px;
+  margin-bottom: 18px;
+  display: flex; flex-direction: column; gap: 8px;
+}
+
+.post-content li { line-height: 1.7; }
+
+.callout {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--accent);
+  border-radius: var(--radius);
+  padding: 20px 24px;
+  margin: 28px 0;
+  color: var(--muted);
+  font-size: 15px;
+}
+
+.callout.result { border-left-color: var(--green); }
+.callout.warning { border-left-color: var(--orange); }
+.callout.insight { border-left-color: var(--purple); }
+
+.callout-label {
+  display: block;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--accent);
+  margin-bottom: 8px;
+}
+
+.callout.result .callout-label { color: var(--green); }
+.callout.warning .callout-label { color: var(--orange); }
+.callout.insight .callout-label { color: var(--purple); }
+
+.metric-row {
+  display: flex; gap: 16px; flex-wrap: wrap;
+  margin: 28px 0;
+}
+
+.metric {
+  flex: 1; min-width: 140px;
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 20px;
+  text-align: center;
+}
+
+.metric-value { font-size: 32px; font-weight: 700; color: var(--accent); letter-spacing: -1px; }
+.metric-label { font-size: 12px; color: var(--muted); margin-top: 4px; }
+
+blockquote {
+  border-left: 3px solid var(--border);
+  padding: 4px 0 4px 20px;
+  margin: 24px 0;
+  color: var(--muted);
+  font-style: italic;
+}
+
+.tags { display: flex; flex-wrap: wrap; gap: 8px; margin: 32px 0 0; }
+.tags span {
+  background: var(--bg3); border: 1px solid var(--border);
+  color: var(--muted); padding: 3px 12px;
+  border-radius: 20px; font-size: 12px;
+}
+
+/* FOOTER */
+.post-footer {
+  margin-top: 56px;
+  padding-top: 32px;
+  border-top: 1px solid var(--border);
+  display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px;
+}
+
+.post-footer a { font-size: 14px; color: var(--muted); display: flex; align-items: center; gap: 8px; }
+.post-footer a:hover { color: var(--accent); opacity: 1; }
+
+@media (max-width: 600px) { article { padding: 32px 16px 60px; } .metric-row { gap: 10px; } }

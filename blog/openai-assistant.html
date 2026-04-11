@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Shipping Azure OpenAI Assistant in Production — Devesh Kumar</title>
+  <meta name="description" content="How our team became the first across MCI to ship Azure OpenAI Assistant API in production, demonstrated live at HMI 2025 with Rolls Royce."/>
+  <link rel="icon" href="../favicon.svg" type="image/svg+xml"/>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"/>
+  <link rel="stylesheet" href="blog.css"/>
+</head>
+<body>
+<nav>
+  <div class="nav-inner">
+    <a href="../index.html" class="nav-back"><i class="fas fa-arrow-left"></i> Back</a>
+    <span class="nav-logo">devesh1102.github.io</span>
+  </div>
+</nav>
+
+<article>
+  <span class="post-category">Engineering</span>
+  <h1 class="post-title">Shipping Azure OpenAI Assistant in Production — First in MCI</h1>
+  <div class="post-meta">
+    <span><i class="fas fa-calendar"></i> Apr 2025</span>
+    <span><i class="fas fa-clock"></i> 7 min read</span>
+    <span><i class="fas fa-tag"></i> Azure OpenAI · LLM · Production</span>
+  </div>
+
+  <div class="post-content">
+
+    <p>In early 2025, our manufacturing AI team became the <strong>first team across all of Microsoft Cloud for Industries (MCI)</strong> to ship the Azure OpenAI Assistant API in a production product. We then demonstrated it live at <strong>HMI 2025</strong> — one of the world's largest industrial automation events — with Rolls Royce as the customer.</p>
+
+    <p>This is what it took to get there.</p>
+
+    <h2>The Starting Point: Copilot V3 Was Good, But Limited</h2>
+
+    <p>Our existing AI layer — Copilot V3 — was a RAG-based pipeline that generated KQL queries from natural language. We'd gotten query accuracy up to 75%+, which was solid. But customers wanted more:</p>
+
+    <ul>
+      <li>Follow-up questions that remembered context from earlier in the conversation</li>
+      <li>Ability to generate charts and visualisations directly from the AI</li>
+      <li>Advanced reasoning, not just query generation</li>
+    </ul>
+
+    <p>These weren't things we could bolt onto a query-generation pipeline. They required a fundamentally different model — the <strong>Azure OpenAI Assistant API</strong>.</p>
+
+    <h2>The Challenge: No Playbook</h2>
+
+    <p>Nobody in MCI had shipped the Assistant API to production before. There was no internal reference implementation, no team to ask "how did you handle X?". We were building the playbook as we went.</p>
+
+    <p>The three hardest problems were:</p>
+
+    <h3>1. Manufacturing Data Is Large — Too Large for the Context Window</h3>
+    <p>A manufacturing plant dataset can have hundreds of thousands of records across production, downtime, consumption, and scheduling. You can't dump all of that into a context window and ask the assistant to reason over it.</p>
+
+    <p>My solution: build a <strong>filtering layer</strong> that sits between the plant dataset and the assistant. Before the assistant ever sees data, the layer queries and extracts only the relevant subset — based on the user's question, the entity graph, and the time range. The assistant then operates on a focused, manageable slice.</p>
+
+    <div class="callout insight">
+      <span class="callout-label">Key insight</span>
+      Filtering data before it reaches the model is not just a performance optimisation — it directly improves accuracy. An assistant that sees 200 relevant rows gives better answers than one swimming in 200,000 rows of noise.
+    </div>
+
+    <h3>2. Views Instead of Complex Traversal Queries</h3>
+    <p>One of the biggest sources of hallucinations in LLM-based systems is complex query generation. The more logic the model has to reason about to construct a query, the more chances for error.</p>
+
+    <p>I created <strong>5 purpose-built ADX views</strong> — pre-computed, materialised views that the assistant could query directly:</p>
+    <ul>
+      <li>Downtime View</li>
+      <li>Actual Production View</li>
+      <li>Actual Consumption View</li>
+      <li>Scheduled Production View</li>
+      <li>Scheduled Consumption View</li>
+    </ul>
+
+    <p>Each view handled all the traversal logic internally. The assistant just needed to pick the right view and apply filters — dramatically simpler than generating traversal queries from scratch.</p>
+
+    <blockquote>"View creation instead of creating complex traversal logic [was key in] avoiding hallucinations." — Manager feedback</blockquote>
+
+    <h3>3. Conversation Threading</h3>
+    <p>Implementing conversation IDs so users could ask follow-up questions was conceptually simple but required careful threading logic — each conversation needed its own thread ID, and the assistant had to consistently pick up context from previous turns without cross-contamination between users.</p>
+
+    <h2>The HMI 2025 Demo</h2>
+
+    <p>The target was to be ready for <strong>HMI 2025</strong> in April — one of the most visible industrial automation events globally, where Rolls Royce was doing a live customer demonstration of our platform.</p>
+
+    <p>We worked with the Rolls Royce team on their specific dataset: ingesting their data, creating custom ADX functions to match their P0 questions, and building a demo flow that showed end-to-end assistant capability — natural language → data → chart — live on stage.</p>
+
+    <div class="callout result">
+      <span class="callout-label">Outcome</span>
+      Assistant achieved accuracy exceeding 75% on the Rolls Royce dataset. Successfully demonstrated live at HMI 2025. First team in MCI to onboard Azure OpenAI Assistant API to production.
+    </div>
+
+    <h2>What We Shipped</h2>
+
+    <ul>
+      <li><strong>Filtering layer</strong> — data subsetting before assistant context</li>
+      <li><strong>Conversation IDs</strong> — persistent multi-turn conversations</li>
+      <li><strong>5 ADX materialised views</strong> — pre-computed data for each domain</li>
+      <li><strong>File search capability</strong> — users can attach domain-specific files; assistant uses similarity search to include relevant content</li>
+      <li><strong>Configurable base prompt</strong> — CRUD APIs for users to add custom instructions to the assistant's base prompt</li>
+      <li><strong>Validate assistant job</strong> — automated scoring of assistant response quality</li>
+      <li><strong>L0 and L2 tests</strong> — full test coverage for all assistant flows</li>
+    </ul>
+
+    <h2>Lessons</h2>
+
+    <ul>
+      <li><strong>Design for the model's limitations, not its capabilities.</strong> The assistant is powerful, but hallucinations happen at the boundary of what it knows. Every design decision I made was about reducing what the model had to reason about from scratch.</li>
+      <li><strong>Get customer data early.</strong> We would have found more edge cases before HMI if we'd had Rolls Royce data in the system sooner. Ship early, test on real data.</li>
+      <li><strong>Materialised views are underrated.</strong> Pre-computing common query shapes dramatically reduces LLM hallucination and query failure rates. The model's job should be filtering and reasoning, not constructing complex joins.</li>
+    </ul>
+
+    <div class="tags">
+      <span>Azure OpenAI</span><span>LLM</span><span>RAG</span><span>Azure Data Explorer</span><span>C#</span><span>.NET</span><span>Prompt Engineering</span>
+    </div>
+  </div>
+
+  <div class="post-footer">
+    <a href="adt-removal.html"><i class="fas fa-arrow-left"></i> Previous: Cutting Ingestion Time by 54%</a>
+    <a href="copilot-accuracy.html">Next: From 40% to 75% Query Accuracy <i class="fas fa-arrow-right"></i></a>
+  </div>
+</article>
+</body>
+</html>
