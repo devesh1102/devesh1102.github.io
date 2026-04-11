@@ -421,6 +421,39 @@ section {
   top: 2px;
 }
 
+.phase-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin: 18px 0 10px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border);
+}
+
+.phase-label {
+  background: rgba(88,166,255,0.12);
+  color: var(--accent);
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 20px;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+
+.phase-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+  flex: 1;
+}
+
+.phase-date {
+  font-size: 12px;
+  color: var(--muted);
+}
+
 /* ===== SKILLS ===== */
 .skills-grid {
   display: grid;
