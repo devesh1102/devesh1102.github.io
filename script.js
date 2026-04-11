@@ -30,6 +30,41 @@ cards.forEach(card => {
   cardObserver.observe(card);
 });
 
+// Contact form — submit via fetch, stay on page
+const contactForm = document.getElementById('contact-form');
+if (contactForm) {
+  contactForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const btn = contactForm.querySelector('button[type="submit"]');
+    const status = document.getElementById('form-status');
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Sending...';
+    try {
+      const res = await fetch('https://formspree.io/f/meepyrkg', {
+        method: 'POST',
+        headers: { 'Accept': 'application/json' },
+        body: new FormData(contactForm)
+      });
+      if (res.ok) {
+        status.style.display = 'block';
+        status.style.color = 'var(--green)';
+        status.textContent = '✓ Message sent! I\'ll get back to you soon.';
+        contactForm.reset();
+        btn.innerHTML = '<i class="fas fa-paper-plane"></i> Send Message';
+        btn.disabled = false;
+      } else {
+        throw new Error();
+      }
+    } catch {
+      status.style.display = 'block';
+      status.style.color = '#f85149';
+      status.textContent = 'Something went wrong. Please email me directly at devesh1102@gmail.com';
+      btn.innerHTML = '<i class="fas fa-paper-plane"></i> Send Message';
+      btn.disabled = false;
+    }
+  });
+}
+
 // Mobile hamburger menu
 const hamburger = document.getElementById('hamburger');
 const navLinks = document.querySelector('.nav-links');
