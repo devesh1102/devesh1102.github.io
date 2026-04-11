@@ -3,12 +3,59 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Devesh Kumar — Developer</title>
+
+  <!-- Primary SEO -->
+  <title>Devesh Kumar — Full Stack Developer</title>
+  <meta name="description" content="Full Stack Developer building clean, performant web applications. Explore my projects, blog posts, and get in touch." />
+  <meta name="author" content="Devesh Kumar" />
+  <link rel="canonical" href="https://devesh1102.github.io/" />
+
+  <!-- Open Graph — controls LinkedIn / Facebook preview -->
+  <meta property="og:type" content="website" />
+  <meta property="og:url" content="https://devesh1102.github.io/" />
+  <meta property="og:title" content="Devesh Kumar — Full Stack Developer" />
+  <meta property="og:description" content="Full Stack Developer building clean, performant web applications. Explore my projects and blog." />
+  <meta property="og:image" content="https://devesh1102.github.io/og-image.png" />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="630" />
+  <meta property="og:site_name" content="Devesh Kumar" />
+
+  <!-- Twitter Card -->
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="Devesh Kumar — Full Stack Developer" />
+  <meta name="twitter:description" content="Full Stack Developer building clean, performant web applications." />
+  <meta name="twitter:image" content="https://devesh1102.github.io/og-image.png" />
+
+  <!-- Favicon -->
+  <link rel="icon" href="favicon.svg" type="image/svg+xml" />
+
+  <!-- Preconnect for performance -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+
+  <!-- JSON-LD structured data (Person schema) -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "Person",
+    "name": "Devesh Kumar",
+    "url": "https://devesh1102.github.io/",
+    "email": "devesh1102@gmail.com",
+    "jobTitle": "Full Stack Developer",
+    "sameAs": [
+      "https://github.com/devesh1102"
+    ]
+  }
+  </script>
+
   <link rel="stylesheet" href="style.css" />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"/>
 </head>
 <body>
+
+  <!-- Skip to content (accessibility) -->
+  <a href="#about" class="skip-link">Skip to main content</a>
 
   <!-- NAV -->
   <nav>
@@ -36,9 +83,9 @@
           <a href="#contact" class="btn btn-outline">Get In Touch</a>
         </div>
         <div class="socials">
-          <a href="https://github.com/devesh1102" target="_blank"><i class="fab fa-github"></i></a>
-          <a href="#" target="_blank"><i class="fab fa-linkedin"></i></a>
-          <a href="#" target="_blank"><i class="fab fa-twitter"></i></a>
+          <a href="https://github.com/devesh1102" target="_blank" rel="noopener noreferrer" aria-label="GitHub"><i class="fab fa-github"></i></a>
+          <a href="#" target="_blank" rel="noopener noreferrer" aria-label="LinkedIn"><i class="fab fa-linkedin"></i></a>
+          <a href="#" target="_blank" rel="noopener noreferrer" aria-label="Twitter"><i class="fab fa-twitter"></i></a>
         </div>
       </div>
       <div class="hero-avatar">
@@ -46,6 +93,40 @@
           <div class="avatar-placeholder">DK</div>
         </div>
         <div class="status-badge"><span class="pulse"></span> Open to work</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- SKILLS -->
+  <section id="skills" aria-label="Skills">
+    <div class="section-header">
+      <h2>Skills</h2>
+      <p>Technologies I work with</p>
+    </div>
+    <div class="skills-grid">
+      <div class="skill-group">
+        <h4><i class="fas fa-code"></i> Languages</h4>
+        <div class="tags">
+          <span>JavaScript</span><span>TypeScript</span><span>Python</span><span>SQL</span>
+        </div>
+      </div>
+      <div class="skill-group">
+        <h4><i class="fas fa-layer-group"></i> Frontend</h4>
+        <div class="tags">
+          <span>React</span><span>Next.js</span><span>HTML</span><span>CSS</span>
+        </div>
+      </div>
+      <div class="skill-group">
+        <h4><i class="fas fa-server"></i> Backend</h4>
+        <div class="tags">
+          <span>Node.js</span><span>Express</span><span>PostgreSQL</span><span>MongoDB</span>
+        </div>
+      </div>
+      <div class="skill-group">
+        <h4><i class="fas fa-tools"></i> Tools</h4>
+        <div class="tags">
+          <span>Git</span><span>Docker</span><span>AWS</span><span>Linux</span>
+        </div>
       </div>
     </div>
   </section>
@@ -177,9 +258,9 @@
         <i class="fas fa-envelope"></i> devesh1102@gmail.com
       </a>
       <div class="socials">
-        <a href="https://github.com/devesh1102" target="_blank"><i class="fab fa-github"></i></a>
-        <a href="#" target="_blank"><i class="fab fa-linkedin"></i></a>
-        <a href="#" target="_blank"><i class="fab fa-twitter"></i></a>
+        <a href="https://github.com/devesh1102" target="_blank" rel="noopener noreferrer" aria-label="GitHub"><i class="fab fa-github"></i></a>
+        <a href="#" target="_blank" rel="noopener noreferrer" aria-label="LinkedIn"><i class="fab fa-linkedin"></i></a>
+        <a href="#" target="_blank" rel="noopener noreferrer" aria-label="Twitter"><i class="fab fa-twitter"></i></a>
       </div>
     </div>
   </section>
