@@ -454,6 +454,64 @@ section {
   color: var(--muted);
 }
 
+/* ===== LEADERSHIP ===== */
+.leadership-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 20px;
+}
+
+.leadership-card {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  transition: border-color 0.2s, transform 0.2s, box-shadow 0.2s;
+}
+
+.leadership-card:hover {
+  transform: translateY(-3px);
+  box-shadow: var(--shadow);
+  border-color: var(--accent);
+}
+
+.lc-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  flex-shrink: 0;
+}
+
+.leadership-card h4 {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.leadership-card p {
+  font-size: 13px;
+  color: var(--muted);
+  line-height: 1.7;
+  margin: 0;
+}
+
+.lc-quote {
+  font-size: 12px;
+  color: var(--muted);
+  font-style: italic;
+  border-left: 2px solid var(--border);
+  padding-left: 10px;
+  margin-top: 4px;
+  line-height: 1.5;
+}
+
 /* ===== SKILLS ===== */
 .skills-grid {
   display: grid;
