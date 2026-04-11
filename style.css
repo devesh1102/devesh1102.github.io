@@ -115,6 +115,43 @@ nav ul a:hover { color: var(--text); opacity: 1; }
   background-clip: text;
 }
 
+.cred-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.cred-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 14px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  border: 1px solid;
+}
+
+.cred-ms {
+  background: rgba(0, 120, 212, 0.12);
+  border-color: rgba(0, 120, 212, 0.4);
+  color: #4da3e8;
+}
+
+.cred-iit {
+  background: rgba(139, 0, 0, 0.12);
+  border-color: rgba(139, 0, 0, 0.4);
+  color: #e06060;
+}
+
+.cred-logo {
+  width: 16px;
+  height: 16px;
+  object-fit: contain;
+  flex-shrink: 0;
+}
+
 .tagline {
   font-size: 16px;
   color: var(--muted);
