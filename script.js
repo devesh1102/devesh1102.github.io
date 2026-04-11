@@ -1,11 +1,11 @@
 // Smooth active nav highlight on scroll
 const sections = document.querySelectorAll('section[id], #projects, #blog, #contact');
-const navLinks = document.querySelectorAll('nav ul a');
+const navHighlightLinks = document.querySelectorAll('nav ul a');
 
 const observer = new IntersectionObserver((entries) => {
   entries.forEach(entry => {
     if (entry.isIntersecting) {
-      navLinks.forEach(link => link.classList.remove('active'));
+      navHighlightLinks.forEach(link => link.classList.remove('active'));
       const active = document.querySelector(`nav a[href="#${entry.target.id}"]`);
       if (active) active.classList.add('active');
     }
