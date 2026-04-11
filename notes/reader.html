@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>System Design Notes — Devesh Kumar</title>
+  <link rel="icon" href="../favicon.svg" type="image/svg+xml"/>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"/>
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #0d1117; --bg2: #161b22; --bg3: #21262d;
+      --border: #30363d; --text: #e6edf3; --muted: #8b949e;
+      --accent: #58a6ff; --purple: #a371f7; --green: #3fb950;
+      --radius: 8px;
+    }
+    html { scroll-behavior: smooth; }
+    body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--text); line-height: 1.7; }
+    a { color: var(--accent); text-decoration: none; }
+    a:hover { opacity: 0.8; }
+
+    nav {
+      position: sticky; top: 0; z-index: 100;
+      background: rgba(13,17,23,0.9); backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border);
+    }
+    .nav-inner {
+      max-width: 860px; margin: 0 auto; padding: 0 24px;
+      height: 56px; display: flex; align-items: center; justify-content: space-between;
+    }
+    .nav-back { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 14px; font-weight: 500; }
+    .nav-back:hover { color: var(--accent); opacity: 1; }
+    .nav-right { display: flex; align-items: center; gap: 16px; }
+    .nav-home { font-size: 13px; color: var(--muted); }
+    .nav-home:hover { color: var(--accent); opacity: 1; }
+
+    .layout { max-width: 860px; margin: 0 auto; padding: 40px 24px 80px; display: flex; gap: 40px; }
+
+    /* TOC sidebar */
+    .toc { width: 200px; flex-shrink: 0; }
+    .toc-inner { position: sticky; top: 76px; }
+    .toc-title { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px; color: var(--muted); margin-bottom: 12px; }
+    .toc-list { list-style: none; display: flex; flex-direction: column; gap: 4px; }
+    .toc-list a { font-size: 12px; color: var(--muted); line-height: 1.5; display: block; padding: 2px 0 2px 8px; border-left: 2px solid transparent; }
+    .toc-list a:hover { color: var(--accent); border-left-color: var(--accent); opacity: 1; }
+
+    /* Main content */
+    .content { flex: 1; min-width: 0; }
+
+    .post-tag {
+      display: inline-block;
+      background: rgba(163,113,247,0.15); color: var(--purple);
+      padding: 3px 12px; border-radius: 20px;
+      font-size: 12px; font-weight: 600;
+      margin-bottom: 16px;
+    }
+
+    /* Markdown rendered styles */
+    .md h1 { font-size: 32px; font-weight: 700; letter-spacing: -0.8px; margin-bottom: 8px; line-height: 1.2; }
+    .md h2 { font-size: 20px; font-weight: 700; margin: 36px 0 12px; padding-bottom: 8px; border-bottom: 1px solid var(--border); color: var(--text); }
+    .md h3 { font-size: 16px; font-weight: 600; margin: 24px 0 8px; color: var(--text); }
+    .md h4 { font-size: 14px; font-weight: 600; margin: 16px 0 6px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.4px; }
+    .md p { color: var(--muted); margin-bottom: 14px; font-size: 15px; line-height: 1.8; }
+    .md strong { color: var(--text); }
+    .md ul, .md ol { color: var(--muted); padding-left: 20px; margin-bottom: 14px; }
+    .md li { margin-bottom: 4px; font-size: 15px; line-height: 1.7; }
+    .md li strong { color: var(--text); }
+    .md code {
+      font-family: 'JetBrains Mono', monospace;
+      background: var(--bg3); border: 1px solid var(--border);
+      padding: 2px 6px; border-radius: 4px; font-size: 13px; color: var(--accent);
+    }
+    .md pre {
+      background: var(--bg2); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 20px;
+      overflow-x: auto; margin: 16px 0;
+    }
+    .md pre code {
+      background: none; border: none; padding: 0;
+      font-size: 13px; color: var(--text); line-height: 1.6;
+    }
+    .md blockquote {
+      border-left: 3px solid var(--accent); padding: 4px 0 4px 16px;
+      margin: 16px 0; color: var(--muted); font-style: italic;
+    }
+    .md table { width: 100%; border-collapse: collapse; margin: 16px 0; font-size: 14px; }
+    .md th { background: var(--bg2); color: var(--text); font-weight: 600; padding: 10px 14px; border: 1px solid var(--border); text-align: left; }
+    .md td { color: var(--muted); padding: 8px 14px; border: 1px solid var(--border); }
+    .md tr:hover td { background: var(--bg2); }
+    .md hr { border: none; border-top: 1px solid var(--border); margin: 28px 0; }
+    .md a { color: var(--accent); }
+
+    .loading { color: var(--muted); font-size: 14px; padding: 40px 0; }
+    .error { color: #f85149; font-size: 14px; padding: 40px 0; }
+
+    @media (max-width: 700px) {
+      .toc { display: none; }
+      .md h1 { font-size: 24px; }
+    }
+  </style>
+</head>
+<body>
+<nav>
+  <div class="nav-inner">
+    <a href="index.html" class="nav-back"><i class="fas fa-arrow-left"></i> All Notes</a>
+    <div class="nav-right">
+      <a href="../index.html" class="nav-home"><i class="fas fa-home"></i> Home</a>
+    </div>
+  </div>
+</nav>
+
+<div class="layout">
+  <aside class="toc">
+    <div class="toc-inner">
+      <div class="toc-title">Contents</div>
+      <ul class="toc-list" id="toc"></ul>
+    </div>
+  </aside>
+
+  <main class="content">
+    <span class="post-tag">System Design</span>
+    <div class="md" id="content">
+      <p class="loading"><i class="fas fa-spinner fa-spin"></i> Loading...</p>
+    </div>
+  </main>
+</div>
+
+<script>
+  const params = new URLSearchParams(window.location.search);
+  const file = params.get('file');
+
+  if (!file) {
+    document.getElementById('content').innerHTML = '<p class="error">No file specified. <a href="index.html">Go back to notes.</a></p>';
+  } else {
+    fetch(file + '.md')
+      .then(r => {
+        if (!r.ok) throw new Error('Not found');
+        return r.text();
+      })
+      .then(md => {
+        const html = marked.parse(md);
+        document.getElementById('content').innerHTML = html;
+
+        // Update page title
+        const h1 = document.querySelector('.md h1');
+        if (h1) document.title = h1.textContent + ' — Devesh Kumar';
+
+        // Build TOC from h2s
+        const headings = document.querySelectorAll('.md h2');
+        const toc = document.getElementById('toc');
+        headings.forEach((h, i) => {
+          const id = 'section-' + i;
+          h.id = id;
+          const li = document.createElement('li');
+          li.innerHTML = `<a href="#${id}">${h.textContent}</a>`;
+          toc.appendChild(li);
+        });
+      })
+      .catch(() => {
+        document.getElementById('content').innerHTML = '<p class="error">Could not load note. <a href="index.html">Go back to notes.</a></p>';
+      });
+  }
+</script>
+</body>
+</html>
