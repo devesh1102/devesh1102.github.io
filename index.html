@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Devesh Kumar — Developer</title>
+  <link rel="stylesheet" href="style.css" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"/>
+</head>
+<body>
+
+  <!-- NAV -->
+  <nav>
+    <div class="nav-inner">
+      <span class="logo">devesh1102</span>
+      <ul>
+        <li><a href="#about">About</a></li>
+        <li><a href="#projects">Projects</a></li>
+        <li><a href="#blog">Blog</a></li>
+        <li><a href="#contact">Contact</a></li>
+      </ul>
+    </div>
+  </nav>
+
+  <!-- HERO -->
+  <section id="about" class="hero">
+    <div class="hero-content">
+      <div class="hero-text">
+        <p class="greeting">Hi, I'm</p>
+        <h1>Devesh Kumar</h1>
+        <h2 class="tagline">Full Stack Developer <span class="dot">·</span> Builder <span class="dot">·</span> Problem Solver</h2>
+        <p class="bio">I build things for the web. Passionate about creating clean, performant, and user-friendly applications. Always learning, always shipping.</p>
+        <div class="hero-btns">
+          <a href="#projects" class="btn btn-primary">View Projects</a>
+          <a href="#contact" class="btn btn-outline">Get In Touch</a>
+        </div>
+        <div class="socials">
+          <a href="https://github.com/devesh1102" target="_blank"><i class="fab fa-github"></i></a>
+          <a href="#" target="_blank"><i class="fab fa-linkedin"></i></a>
+          <a href="#" target="_blank"><i class="fab fa-twitter"></i></a>
+        </div>
+      </div>
+      <div class="hero-avatar">
+        <div class="avatar-ring">
+          <div class="avatar-placeholder">DK</div>
+        </div>
+        <div class="status-badge"><span class="pulse"></span> Open to work</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- PROJECTS TIMELINE -->
+  <section id="projects">
+    <div class="section-header">
+      <h2>Projects</h2>
+      <p>Things I've built — newest first</p>
+    </div>
+    <div class="timeline">
+
+      <div class="timeline-item">
+        <div class="timeline-dot"></div>
+        <div class="timeline-date">2024</div>
+        <div class="card">
+          <div class="card-top">
+            <h3>Project Alpha</h3>
+            <div class="card-links">
+              <a href="#" title="GitHub"><i class="fab fa-github"></i></a>
+              <a href="#" title="Live"><i class="fas fa-external-link-alt"></i></a>
+            </div>
+          </div>
+          <p>A full-stack web application built with React and Node.js. Handles real-time data with WebSockets and a PostgreSQL backend.</p>
+          <div class="tags">
+            <span>React</span><span>Node.js</span><span>PostgreSQL</span><span>WebSockets</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="timeline-item">
+        <div class="timeline-dot"></div>
+        <div class="timeline-date">2024</div>
+        <div class="card">
+          <div class="card-top">
+            <h3>Project Beta</h3>
+            <div class="card-links">
+              <a href="#" title="GitHub"><i class="fab fa-github"></i></a>
+              <a href="#" title="Live"><i class="fas fa-external-link-alt"></i></a>
+            </div>
+          </div>
+          <p>A mobile-first e-commerce platform with payment integration, cart management, and an admin dashboard.</p>
+          <div class="tags">
+            <span>Next.js</span><span>Stripe</span><span>Tailwind</span><span>MongoDB</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="timeline-item">
+        <div class="timeline-dot"></div>
+        <div class="timeline-date">2023</div>
+        <div class="card">
+          <div class="card-top">
+            <h3>Project Gamma</h3>
+            <div class="card-links">
+              <a href="#" title="GitHub"><i class="fab fa-github"></i></a>
+              <a href="#" title="Live"><i class="fas fa-external-link-alt"></i></a>
+            </div>
+          </div>
+          <p>CLI tool that automates deployment workflows, reducing deployment time by 60%. Built with Python and integrated with AWS.</p>
+          <div class="tags">
+            <span>Python</span><span>AWS</span><span>Docker</span><span>CLI</span>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- BLOG TIMELINE -->
+  <section id="blog">
+    <div class="section-header">
+      <h2>Blog</h2>
+      <p>Thoughts, learnings & write-ups — newest first</p>
+    </div>
+    <div class="timeline">
+
+      <div class="timeline-item">
+        <div class="timeline-dot blog-dot"></div>
+        <div class="timeline-date">Mar 2024</div>
+        <div class="card blog-card">
+          <div class="card-top">
+            <span class="blog-tag">Tutorial</span>
+            <span class="read-time"><i class="fas fa-clock"></i> 5 min read</span>
+          </div>
+          <h3>Building Scalable APIs with Node.js</h3>
+          <p>How I structured a REST API that handles 10k+ requests/second using clustering, caching, and connection pooling.</p>
+          <a href="#" class="read-more">Read more <i class="fas fa-arrow-right"></i></a>
+        </div>
+      </div>
+
+      <div class="timeline-item">
+        <div class="timeline-dot blog-dot"></div>
+        <div class="timeline-date">Jan 2024</div>
+        <div class="card blog-card">
+          <div class="card-top">
+            <span class="blog-tag">Deep Dive</span>
+            <span class="read-time"><i class="fas fa-clock"></i> 8 min read</span>
+          </div>
+          <h3>React Performance: What I Learned the Hard Way</h3>
+          <p>Profiling, memoization, virtualization — practical tips from real debugging sessions that cut render time in half.</p>
+          <a href="#" class="read-more">Read more <i class="fas fa-arrow-right"></i></a>
+        </div>
+      </div>
+
+      <div class="timeline-item">
+        <div class="timeline-dot blog-dot"></div>
+        <div class="timeline-date">Nov 2023</div>
+        <div class="card blog-card">
+          <div class="card-top">
+            <span class="blog-tag">Opinion</span>
+            <span class="read-time"><i class="fas fa-clock"></i> 3 min read</span>
+          </div>
+          <h3>Why I Switched from REST to GraphQL (and Back)</h3>
+          <p>My honest experience with GraphQL in production — what worked, what didn't, and when each approach makes sense.</p>
+          <a href="#" class="read-more">Read more <i class="fas fa-arrow-right"></i></a>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- CONTACT -->
+  <section id="contact">
+    <div class="contact-box">
+      <h2>Let's Connect</h2>
+      <p>Whether it's a project, opportunity, or just a chat — my inbox is always open.</p>
+      <a href="mailto:devesh1102@gmail.com" class="btn btn-primary">
+        <i class="fas fa-envelope"></i> devesh1102@gmail.com
+      </a>
+      <div class="socials">
+        <a href="https://github.com/devesh1102" target="_blank"><i class="fab fa-github"></i></a>
+        <a href="#" target="_blank"><i class="fab fa-linkedin"></i></a>
+        <a href="#" target="_blank"><i class="fab fa-twitter"></i></a>
+      </div>
+    </div>
+  </section>
+
+  <!-- FOOTER -->
+  <footer>
+    <p>Built by Devesh Kumar · <a href="https://github.com/devesh1102/devesh1102.github.io" target="_blank">Source</a></p>
+  </footer>
+
+  <script src="script.js"></script>
+</body>
+</html>
