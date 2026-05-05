@@ -142,6 +142,8 @@ Decouple microservices communication
 
 ## Architecture Diagram
 
+A Kafka cluster is made up of multiple **brokers**, each hosting a set of partition replicas. Producers write to partition leaders, and followers replicate data for fault tolerance. **Zookeeper** (or KRaft in newer versions) sits outside the data path and handles coordination — broker discovery, leader election, and cluster metadata. No single broker is a point of failure.
+
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
 │                         KAFKA CLUSTER                                │
@@ -169,6 +171,8 @@ Legend: (L) = Leader, (F) = Follower
 ```
 
 ## Topic with Partitions
+
+A topic is split into **partitions** to allow parallel reads and writes. Each partition is an append-only, ordered log of messages identified by **offsets** (starting at 0). With a replication factor of 2, every partition has one Leader (takes all reads/writes) and one Follower (stays in sync, ready to take over). Partitions are spread across brokers so the load is distributed — no single broker holds all the data.
 
 ```
 Topic: "user-events" (3 partitions, replication factor = 2)
@@ -279,6 +283,8 @@ KEY RULES:
 
 ## Consumer Group Rebalancing
 
+When a consumer in a group **crashes or leaves**, Kafka detects it via a missed heartbeat and triggers a rebalance. The **Group Coordinator** (a broker) redistributes the orphaned partitions among surviving consumers. During a rebalance, consumption is paused briefly — this is a known latency hit. The same rebalance also happens when a new consumer joins the group. Kafka tracks the last committed offset for each partition, so the new owner picks up exactly where the failed consumer left off.
+
 ```
 BEFORE (3 consumers, 4 partitions):
 
@@ -304,6 +310,8 @@ Partition 2 reassigned to Consumer C
 ```
 
 ## Multiple Consumer Groups
+
+Kafka's fan-out model allows **multiple independent consumer groups** to read from the same topic simultaneously. Each group maintains its own set of offsets — they don't interfere with each other. This means the same event stream can power a database writer, a cache updater, and an alerting system all at once, with each group consuming at its own pace. This is fundamentally different from a traditional queue where a message is consumed by only one reader.
 
 ```
               Topic: "user-activity"
@@ -332,6 +340,8 @@ All groups receive ALL messages
 
 ## Offset Management
 
+An **offset** is a monotonically increasing integer that identifies a message's position within a partition. Each consumer group independently tracks its own current offset per partition — stored in an internal Kafka topic (`__consumer_offsets`). Because offsets are separate per group, one slow consumer doesn't block others. Crucially, you can **reset an offset** to any point in the past to replay messages — something traditional message queues can't do.
+
 ```
 Partition: orders-0
 
@@ -349,6 +359,8 @@ Can reset offset to replay messages
 ```
 
 ## Message Structure
+
+Every unit of data in Kafka is called a **record** (or message/event). The **Key** is optional but critical — it controls which partition the message lands in (same key always goes to same partition), enabling ordering guarantees per entity. The **Value** is the actual payload and is just raw bytes — Kafka doesn't care about the format (JSON, Avro, Protobuf, etc.). The **Offset** and **Partition** fields are assigned by Kafka itself, not the producer.
 
 ```
 ┌─────────────────────────────────────────────────┐
@@ -376,6 +388,8 @@ Can reset offset to replay messages
 
 ## Replication and Leader Election
 
+Kafka replicates each partition across multiple brokers for **fault tolerance**. At any time, one replica is the **Leader** (handles all producer writes and consumer reads) and the rest are **Followers** (pull data from the leader to stay in sync). The set of followers caught up with the leader is called the **ISR (In-Sync Replicas)**. When the leader broker fails, Zookeeper/KRaft promotes the most up-to-date ISR follower to become the new leader — with zero data loss since ISR replicas were fully synced.
+
 ```
 Topic: "transactions" (Partition 0, Replication Factor = 3)
 
@@ -387,9 +401,9 @@ NORMAL OPERATION:
 │  Partition 0 │        │  Partition 0 │        │  Partition 0 │
 │  (LEADER)    │───────▶│  (FOLLOWER)  │        │  (FOLLOWER)  │
 │              │    │   │              │        │              │
-│  ┌─┬─┬─┬─┐  │    │   │  ┌─┬─┬─┬─┐  │        │  ┌─┬─┬─┬─┐  │
-│  │0│1│2│3│  │    └──▶│  │0│1│2│3│  │◀───────│  │0│1│2│3│  │
-│  └─┴─┴─┴─┘  │        │  └─┴─┴─┴─┘  │        │  └─┴─┴─┴─┘  │
+│  ┌─┬─┬─┬─┐   │    │   │  ┌─┬─┬─┬─┐   │        │  ┌─┬─┬─┬─┐   │
+│  │0│1│2│3│   │    └──▶│  │0│1│2│3│   │◀───────│  │0│1│2│3│   │
+│  └─┴─┴─┴─┘   │        │  └─┴─┴─┴─┘   │        │  └─┴─┴─┴─┘   │
 └──────────────┘        └──────────────┘        └──────────────┘
        ▲                                                │
        │                                                │
@@ -405,9 +419,9 @@ BROKER 1 FAILS ❌:
 │      ❌      │        │  Partition 0 │        │  Partition 0 │
 │              │        │  (NEW LEADER)│───────▶│  (FOLLOWER)  │
 │              │        │              │        │              │
-│              │        │  ┌─┬─┬─┬─┐  │        │  ┌─┬─┬─┬─┐  │
-│              │        │  │0│1│2│3│  │        │  │0│1│2│3│  │
-│              │        │  └─┴─┴─┴─┘  │        │  └─┴─┴─┴─┘  │
+│              │        │  ┌─┬─┬─┬─┐   │        │  ┌─┬─┬─┬─┐   │
+│              │        │  │0│1│2│3│   │        │  │0│1│2│3│   │
+│              │        │  └─┴─┴─┴─┘   │        │  └─┴─┴─┴─┘   │
 └──────────────┘        └──────────────┘        └──────────────┘
                                ▲
                                │
@@ -503,6 +517,96 @@ enable.auto.commit: Auto vs manual commit
 max.poll.records: Records per poll
 session.timeout.ms: Heartbeat timeout
 fetch.min.bytes: Min data to fetch
+```
+
+---
+
+## Sequencing vs Speed Tradeoffs
+
+### The Core Problem
+
+Kafka guarantees **ordering within a partition only** — not across partitions.
+This creates a fundamental tradeoff: the moment you care about strict ordering, you are constrained in how you can scale.
+
+---
+
+### Scenario 1 — Multiple Consumers, One Partition
+
+You **cannot** have 2 consumers (in the same group) reading from 1 partition simultaneously.
+
+```
+Partition-0  →  Consumer-1  ✅
+             →  Consumer-2  ❌ (sits idle, no work)
+```
+
+Kafka strictly enforces **one consumer per partition** within a consumer group.
+Adding more consumers than partitions = wasted resources, zero speed gain.
+
+> Want more speed? You **must** add more partitions. There is no other way.
+
+---
+
+### Scenario 2 — More Partitions = Broken Sequence
+
+The moment you add partitions, ordering guarantee is **gone** across them.
+
+```
+Producer sends: E1 → E2 → E3 → E4 → E5  (for User-123, no key set)
+
+Kafka distributes across partitions:
+  Partition-0  →  E1, E3, E5
+  Partition-1  →  E2, E4
+
+Consumer-A reads P0: sees E1, E3, E5
+Consumer-B reads P1: sees E2, E4
+
+Merged reality: out-of-order unless you re-sort manually
+```
+
+Without key-based routing, consumers see **interleaved, out-of-order events**.
+
+---
+
+### The Trap
+
+```
+Need speed?     → Add partitions  → Lose sequence
+Need sequence?  → One partition   → Lose speed
+```
+
+There is no free lunch. You pick one — unless you use partition keys.
+
+---
+
+### The Escape: Partition by Key
+
+Route all events for the same entity to the **same partition** using a key:
+
+```java
+producer.send(new ProducerRecord("topic", userId, event));
+//                                          ^^^^^^ key determines partition
+```
+
+```
+User-123 events → always Partition-0  (ordered ✅)
+User-456 events → always Partition-2  (ordered ✅)
+User-789 events → always Partition-1  (ordered ✅)
+
+Each partition has its own consumer → parallel processing ✅
+```
+
+**Result:** Order within an entity, speed across entities.
+
+---
+
+### Decision Matrix
+
+| Scenario | Approach | Tradeoff |
+|----------|----------|----------|
+| Global strict order | 1 partition, 1 consumer | No parallelism |
+| Max throughput, no order | Many partitions, no key | Unordered events |
+| Per-entity order + speed | Partition by entity key | Order per key only |
+| IoT / analytics | Partition by device ID | Order per device |
 ```
 
 ### Topic Configs:
