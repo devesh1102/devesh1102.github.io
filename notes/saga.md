@@ -41,25 +41,6 @@ Each service reacts to events from Kafka and publishes its own events when done.
 
 ![Choreography Flow](./images/saga-choreography.svg)
 
-```mermaid
-sequenceDiagram
-    participant OS as Order Service
-    participant K as Kafka
-    participant PS as Payment Service
-    participant RS as Restaurant Service
-    participant DS as Delivery Service
-
-    OS->>K: order.created
-    K->>PS: order.created
-    PS->>K: payment.confirmed
-    K->>RS: payment.confirmed
-    RS->>K: order.confirmed
-    K->>DS: order.confirmed
-    DS->>K: partner.assigned
-
-    Note over OS,DS: No central coordinator — each service reacts to events
-```
-
 #### How it works
 1. Order Service creates the order and publishes `order.created`
 2. Payment Service **listens** for `order.created`, charges the card, publishes `payment.confirmed`
@@ -86,24 +67,6 @@ A dedicated **Saga Orchestrator** service drives the entire flow. It explicitly 
 
 ![Orchestration Flow](./images/saga-orchestration.svg)
 
-```mermaid
-sequenceDiagram
-    participant O as Saga Orchestrator
-    participant PS as Payment Service
-    participant RS as Restaurant Service
-    participant DS as Delivery Service
-
-    O->>PS: charge card
-    PS-->>O: payment success
-    O->>RS: confirm order
-    RS-->>O: order confirmed
-    O->>DS: assign partner
-    DS-->>O: partner assigned
-    O->>O: Saga complete ✓
-
-    Note over O,DS: Central coordinator drives every step
-```
-
 #### How it works
 The Orchestrator owns a **saga state machine** — it knows exactly which step it's on and what to do next. Each service is just a worker that receives a command and returns a result. The Orchestrator decides the sequencing.
 
@@ -124,27 +87,6 @@ The Orchestrator owns a **saga state machine** — it knows exactly which step i
 Since there's no `ROLLBACK`, every step in a Saga must have a corresponding **compensating transaction** — an operation that logically undoes it if a later step fails.
 
 ![Compensating Transactions](./images/saga-compensating.svg)
-
-```mermaid
-sequenceDiagram
-    participant O as Saga Orchestrator
-    participant PS as Payment Service
-    participant RS as Restaurant Service
-    participant DS as Delivery Service
-
-    O->>PS: charge card
-    PS-->>O: success
-    O->>RS: confirm order
-    RS-->>O: success
-    O->>DS: assign partner
-    DS-->>O: FAILED — no partner available
-
-    Note over O,DS: Rollback via compensating transactions
-    O->>RS: cancel order
-    RS-->>O: cancelled
-    O->>PS: issue refund
-    PS-->>O: refunded
-```
 
 #### Compensating transaction table
 
@@ -177,20 +119,6 @@ Result: Order is confirmed in DB, but Restaurant Service never hears about it.
 The **Outbox Pattern** solves this by making the Kafka publish part of the same DB transaction:
 
 ![Outbox Pattern](./images/saga-outbox.svg)
-
-```mermaid
-flowchart LR
-    OS[Order Service] -->|1. Write order row| DB[(PostgreSQL)]
-    OS -->|2. Write event row| OB[(Outbox Table)]
-    OP[Outbox Poller] -->|3. Poll unsent events| OB
-    OP -->|4. Publish| K[Kafka]
-    K -->|5. Consume| RS[Restaurant Service]
-    OB -->|mark sent| OP
-
-    style K fill:#f0883e,color:#fff
-    style DB fill:#3fb950,color:#fff
-    style OB fill:#3fb950,color:#fff
-```
 
 #### How it works
 

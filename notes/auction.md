@@ -56,26 +56,6 @@
 
 ![Auction System Architecture](./images/auction-arch.svg)
 
-```mermaid
-flowchart TD
-    U([User]) -->|POST /bid| AG[API Gateway\nAuth + Rate Limit]
-    AG --> BS[Bid Service]
-    BS -->|Validate + publish| K["Kafka\nPartition key = auctionId\n(same auction → same partition)"]
-    K --> BP[Bid Processor\nSingle consumer per partition]
-    BP --> R[("Redis\nCurrent bid state\nAuction TTL")]
-    BP --> DB[(PostgreSQL\nBids table\nOptimistic lock)]
-    BP -->|Bid result event| K2[Kafka\nbid-results topic]
-    K2 --> NS[Notification Service]
-    NS -->|WebSocket push| U
-
-    style U fill:#1f6feb,color:#fff
-    style K fill:#f0883e,color:#fff
-    style K2 fill:#f0883e,color:#fff
-    style R fill:#a371f7,color:#fff
-    style DB fill:#3fb950,color:#fff
-    style BP fill:#161b22,stroke:#58a6ff,color:#e6edf3
-```
-
 ---
 
 ## How Each Flow Works
@@ -168,28 +148,6 @@ Instead of two bids racing to the DB simultaneously, they queue in Kafka and are
 ### Solution 1: Kafka Partition Serialisation (Primary Defence)
 
 ![Race Condition & Kafka Solution](./images/auction-race.svg)
-
-```mermaid
-flowchart LR
-    subgraph "Bids arriving concurrently"
-        BA[User A: bid $110] 
-        BB[User B: bid $110]
-        BC[User C: bid $115]
-    end
-
-    subgraph "Kafka — partitioned by auctionId"
-        P["Partition 7\n(auctionId = 42)\nBA → BB → BC\n(ordered queue)"]
-    end
-
-    subgraph "Single Consumer (Bid Processor)"
-        PR1[Process BA: $110 > $100 ✅ Accept]
-        PR2[Process BB: $110 = $110 ❌ Reject — not higher]
-        PR3[Process BC: $115 > $110 ✅ Accept]
-    end
-
-    BA & BB & BC --> P
-    P --> PR1 --> PR2 --> PR3
-```
 
 **Why this works:**
 - Kafka guarantees messages with the same key (auctionId) go to the **same partition**

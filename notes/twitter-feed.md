@@ -270,27 +270,6 @@ flowchart TD
 
 ![Fan-out Strategy Comparison](./images/twitter-fanout.svg)
 
-```mermaid
-flowchart LR
-    subgraph "Fan-out on Write (Push)"
-        TW1[Tweet posted] --> FW[Write to each\nfollower's Redis timeline]
-        FW --> |"Read = instant Redis lookup"| R1[Fast reads]
-        FW --> |"150M followers = 150M writes"| W1[Write storm]
-    end
-
-    subgraph "Fan-out on Read (Pull)"
-        TW2[Tweet posted] --> ST[Store once in DB]
-        ST --> |"Read = JOIN all followees"| SL[Slow reads]
-        ST --> |"Write = just one row"| CW[Cheap writes]
-    end
-
-    subgraph "Hybrid (Twitter's approach)"
-        TW3[Tweet posted] --> HY{Author has\n>1M followers?}
-        HY -->|No| PUSH[Fan-out on Write\nto Redis timelines]
-        HY -->|Yes Celebrity| PULL[Skip push\nFetch at read time]
-    end
-```
-
 ### Timeline Data Structure (Redis Sorted Set)
 ```
 Key  : timeline:{userId}
@@ -315,28 +294,6 @@ Operations:
 ### Read Path (Timeline Assembly)
 
 ![Read Path](./images/twitter-read-path.svg)
-
-```mermaid
-sequenceDiagram
-    participant Client
-    participant TLS as Timeline Service
-    participant Redis as Redis (Sorted Set)
-    participant Cache as Tweet Cache (Redis)
-    participant DB as PostgreSQL
-    participant Celeb as Celebrity Service
-    participant ML as Ranking Service
-
-    Client->>TLS: GET /feed?page=1
-    TLS->>Redis: ZREVRANGE timeline:{userId} 0 49
-    Redis-->>TLS: [tweetId1, tweetId2, ... tweetId50]
-    TLS->>Cache: MGET tweet:{id} x50
-    Cache-->>TLS: tweet content (cache misses → DB fallback)
-    TLS->>Celeb: Fetch latest tweets from followed celebrities
-    Celeb-->>TLS: celebrity tweets
-    TLS->>ML: Score all tweets by predicted engagement
-    ML-->>TLS: ranked tweet list
-    TLS-->>Client: Personalised feed
-```
 
 ### Background Jobs
 | Job | Trigger | Action |

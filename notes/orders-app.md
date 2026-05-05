@@ -54,33 +54,6 @@
 
 ![High-Level Architecture](./images/orders-arch.svg)
 
-```mermaid
-flowchart TD
-    Client([Client App]) -->|REST| GW[API Gateway\nAuth + Rate Limit]
-
-    GW --> OS[Order Service]
-    GW --> PS[Payment Service]
-    GW --> RS[Restaurant Service]
-    GW --> DS[Delivery Service]
-
-    OS -->|Sync| PS
-    OS -->|Write| DB1[(PostgreSQL\nOrders)]
-    OS -->|Publish events| K[Kafka]
-
-    K --> RS
-    K --> DS
-    K --> NS[Notification Service]
-    K --> TS[Tracking Service]
-
-    DS --> R[(Redis\nPartner Locations)]
-    TS -->|WebSocket| Client
-
-    style Client fill:#1f6feb,color:#fff
-    style K fill:#f0883e,color:#fff
-    style DB1 fill:#3fb950,color:#fff
-    style R fill:#a371f7,color:#fff
-```
-
 #### What each service does
 
 **API Gateway**
@@ -182,46 +155,6 @@ No service reads another service's DB directly. The only shared communication ch
 This is the full sequential journey of one order, from tap to delivery, showing exactly when each Kafka event fires and who reacts to it.
 
 ![Full Kafka Event Flow](./images/orders-kafka-flow.svg)
-
-```mermaid
-sequenceDiagram
-    participant C as Client
-    participant OS as Order Service
-    participant PS as Payment Service
-    participant K as Kafka
-    participant RS as Restaurant Service
-    participant DS as Delivery Service
-    participant NS as Notification Service
-    participant TS as Tracking Service
-
-    C->>OS: POST /order
-    OS->>OS: Validate + Create (PLACED)
-    OS->>PS: Charge card (SYNC)
-    PS-->>OS: Success
-    OS->>OS: Update → PAYMENT_CONFIRMED
-    OS->>K: order.payment_confirmed
-    OS-->>C: 200 OK
-    Note over K,NS: ASYNC from here
-    K->>RS: order.payment_confirmed
-    K->>NS: order.payment_confirmed
-    NS-->>C: Push — We got your order!
-    RS->>K: order.confirmed
-    K->>DS: order.confirmed
-    K->>NS: order.confirmed
-    NS-->>C: Push — Restaurant confirmed!
-    DS->>K: order.partner_assigned
-    RS->>K: order.preparing
-    K->>NS: order.preparing
-    NS-->>C: Push — Food is being prepared
-    DS->>K: order.out_for_delivery
-    K->>NS: order.out_for_delivery
-    K->>TS: order.out_for_delivery
-    NS-->>C: Push — Order is on the way!
-    TS-->>C: WebSocket — live GPS updates
-    DS->>K: order.delivered
-    K->>NS: order.delivered
-    NS-->>C: Push — Delivered! Rate your order
-```
 
 ### Step-by-step walkthrough
 
@@ -336,24 +269,6 @@ Partner taps "Delivered" (or OTP is confirmed). Delivery Service:
 
 ![Order State Machine](./images/orders-states.svg)
 
-```mermaid
-stateDiagram-v2
-    [*] --> PLACED : User submits order
-    PLACED --> PAYMENT_CONFIRMED : Payment succeeds
-    PLACED --> FAILED : Payment fails
-    PAYMENT_CONFIRMED --> CONFIRMED : Restaurant accepts
-    PAYMENT_CONFIRMED --> CANCELLED : Restaurant timeout (3 min)
-    CONFIRMED --> PREPARING : Restaurant starts cooking
-    PREPARING --> OUT_FOR_DELIVERY : Partner picks up
-    OUT_FOR_DELIVERY --> DELIVERED : Delivery confirmed
-    DELIVERED --> [*]
-
-    PLACED --> CANCELLED : User cancels
-    CONFIRMED --> CANCELLED : User cancels
-
-    note right of PAYMENT_CONFIRMED : Kafka event published\non every transition
-```
-
 #### How each state transition works
 
 **PLACED**
@@ -387,31 +302,6 @@ Can be triggered by: user cancellation (before CONFIRMED), restaurant timeout, o
 ### Order Placement Flow (Sync vs Async)
 
 ![Order Placement Flow](./images/orders-placement.svg)
-
-```mermaid
-sequenceDiagram
-    participant Client
-    participant OrderService as Order Service
-    participant PaymentService as Payment Service
-    participant Kafka
-    participant Restaurant as Restaurant Service
-    participant Notification as Notification Service
-
-    Client->>OrderService: POST /order (idempotency_key)
-    OrderService->>OrderService: Validate cart, check availability
-    OrderService->>OrderService: Create order → status: PLACED
-    OrderService->>PaymentService: Charge card (SYNC — user waits)
-    PaymentService-->>OrderService: Payment success
-    OrderService->>OrderService: Update → PAYMENT_CONFIRMED
-    OrderService->>Kafka: Publish order.payment_confirmed
-    OrderService-->>Client: 200 OK (fast response)
-
-    Note over Kafka,Notification: Everything below is ASYNC
-
-    Kafka->>Restaurant: Consume order.payment_confirmed
-    Restaurant->>Kafka: Publish order.confirmed
-    Kafka->>Notification: Send "Order confirmed!" push
-```
 
 #### How the order placement flow works — step by step
 
@@ -524,18 +414,6 @@ Both read from the same Redis key. Writes are last-write-wins (fine for cart —
 ### Real-time Tracking Architecture
 
 ![Real-time Tracking](./images/orders-tracking.svg)
-
-```mermaid
-flowchart LR
-    PA([Partner App])-->|GPS ping every 5s| DS[Delivery Service]
-    DS -->|SET location:partnerId lat,lng EX 10| R[(Redis)]
-    R -->|Poll every 2s| TS[Tracking Service]
-    TS -->|WebSocket push| CA([Customer App])
-
-    style PA fill:#f0883e,color:#fff
-    style CA fill:#1f6feb,color:#fff
-    style R fill:#a371f7,color:#fff
-```
 
 #### How real-time tracking works — step by step
 

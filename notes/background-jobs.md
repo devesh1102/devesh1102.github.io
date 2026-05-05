@@ -117,25 +117,6 @@
 
 ![Retry & Dead Letter Queue Flow](./images/background-jobs-retry.svg)
 
-```mermaid
-flowchart TD
-    J[Job starts] --> P{Success?}
-    P -->|Yes| D[Done]
-    P -->|No| R1[Retry after 1s]
-    R1 --> P2{Success?}
-    P2 -->|Yes| D
-    P2 -->|No| R2[Retry after 2s]
-    R2 --> P3{Success?}
-    P3 -->|Yes| D
-    P3 -->|No| RN["Retry after 4s, 8s, 16s..."]
-    RN --> MAX{Max retries\nreached?}
-    MAX -->|Yes| DLQ[(Dead Letter Queue\nAlert)]
-    MAX -->|No| P
-
-    style D fill:#3fb950,color:#fff
-    style DLQ fill:#f85149,color:#fff
-```
-
 > Add **jitter** (±20% random) to avoid all workers retrying at the exact same second.
 
 ### Dead Letter Queue (DLQ)

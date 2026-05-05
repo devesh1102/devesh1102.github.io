@@ -55,31 +55,6 @@
 
 ![YouTube Upload & Serving Pipeline](./images/youtube-pipeline.svg)
 
-```mermaid
-flowchart TD
-    subgraph Upload Path
-        Creator([Creator]) -->|1. Request upload URL| US[Upload Service]
-        US -->|2. Return pre-signed URL| Creator
-        Creator -->|3. Direct multi-part upload| S3R[(S3\nRaw Uploads)]
-        S3R -->|4. S3 event trigger| K[Kafka\nvideo.uploaded]
-        K --> PP[Processing Pipeline]
-        PP -->|Transcoded HLS segments| S3P[(S3\nProcessed Videos)]
-        PP -->|Update status: READY| DB[(PostgreSQL\nVideo Metadata)]
-    end
-
-    subgraph Serve Path
-        Viewer([Viewer]) -->|GET /watch?v=xyz| VS[Video Service]
-        VS -->|metadata + manifest URL| Viewer
-        Viewer -->|Fetch manifest + segments| CDN[CDN\nEdge Node]
-        CDN -->|Cache miss only| S3P
-    end
-
-    style Creator fill:#f0883e,color:#fff
-    style Viewer fill:#1f6feb,color:#fff
-    style K fill:#f0883e,color:#fff
-    style CDN fill:#a371f7,color:#fff
-```
-
 ---
 
 ## Step 4: Deep Dive
@@ -87,21 +62,6 @@ flowchart TD
 ### Why Pre-Signed S3 URL (Direct Upload)?
 
 ![Pre-signed S3 URL vs direct server upload](./images/youtube-presigned.svg)
-
-```mermaid
-flowchart LR
-    subgraph "Bad: Upload via your server"
-        C1([Creator]) -->|50GB video| YS[Your Server]
-        YS -->|50GB video| S3A[(S3)]
-        YS -.->|Bottleneck - Bandwidth doubled| X1[Problem]
-    end
-
-    subgraph "Good: Pre-signed URL"
-        C2([Creator]) -->|1. GET /upload-url| US[Upload Service]
-        US -->|2. Pre-signed S3 URL| C2
-        C2 -->|3. Upload directly| S3B[(S3)]
-    end
-```
 
 ### Resumable Multi-part Upload
 ```
@@ -132,15 +92,6 @@ HLS solution:
 ### HLS Folder Structure in S3
 
 ![HLS segments vs single MP4](./images/youtube-hls.svg)
-
-```mermaid
-flowchart TD
-    V["/videos/{videoId}/"] --> M["manifest.m3u8\n(master playlist)"]
-    V --> R1["360p/\n  index.m3u8\n  seg001.ts\n  seg002.ts"]
-    V --> R2["720p/\n  index.m3u8\n  seg001.ts"]
-    V --> R3["1080p/\n  index.m3u8\n  seg001.ts"]
-    V --> R4["4K/\n  index.m3u8\n  seg001.ts"]
-```
 
 ### Processing Pipeline (Async, Parallel)
 
