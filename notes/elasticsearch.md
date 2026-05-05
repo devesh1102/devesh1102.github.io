@@ -4,6 +4,76 @@
 
 Elasticsearch is a distributed, open-source search and analytics engine built on Apache Lucene. It provides a RESTful API and is designed for horizontal scalability, reliability, and real-time search capabilities.
 
+## Storage or Compute?
+
+**Elasticsearch is both — it stores data AND computes over it.**
+
+| Role | Details |
+|---|---|
+| **Storage** | Documents are persisted to disk in Lucene segment files. Data survives restarts. |
+| **Compute** | Search ranking (BM25), aggregations, geo queries, and analytics all run inside ES nodes. |
+| **NOT a primary DB** | Lacks ACID transactions, foreign keys, and strong consistency. Don't use as your source of truth. |
+| **Typical pattern** | Write to your primary DB (Postgres/MySQL) first → sync to Elasticsearch for search/analytics. |
+
+> **Rule of thumb**: Elasticsearch owns the search/analytics layer. Your relational or document DB owns the source of truth. They stay in sync via CDC (Change Data Capture) or dual-writes.
+
+## Why Elasticsearch?
+
+* **When SQL LIKE/ILIKE is too slow**: Full-text search across millions of documents in milliseconds
+* **Relevance matters**: You need ranked results, not just exact matches (BM25 scoring)
+* **Scale reads horizontally**: Add more nodes to scale search capacity without changing application code
+* **Analytics on top of search**: Run aggregations and dashboards on the same data you search
+* **Unstructured / semi-structured data**: Schema-free indexing lets you evolve your data model without migrations
+* **Log & event analysis**: Ingest, search, and visualize billions of log lines (ELK stack)
+* **Near real-time**: New documents appear in search within ~1 second of indexing
+
+## Common Use Cases
+
+### 1. E-commerce / Site Search
+* Users search for products with typos, synonyms, and partial words — SQL can't handle this well
+* Elasticsearch provides fuzzy matching, synonym expansion, and faceted filters (brand, price range, category)
+* Relevance scoring ensures the best-matching product appears first
+* **Example**: Amazon, Flipkart — "iphone charger" returns results even if indexed as "iPhone Charging Cable"
+
+### 2. Log & Metrics Analytics (ELK Stack)
+* Applications emit millions of log lines per minute — you need to search and aggregate them fast
+* Logstash / Filebeat ships logs → Elasticsearch indexes them → Kibana visualizes them
+* Supports structured (JSON logs) and unstructured (plain text) log formats
+* **Example**: Find all 5xx errors from a specific service in the last 1 hour, grouped by endpoint
+
+### 3. Full-text Document Search
+* Index PDFs, wiki articles, support tickets, emails — anything with text content
+* Users can search by keywords and get results ranked by relevance
+* Supports highlighting (show which part of doc matched the query)
+* **Example**: Confluence, Notion, legal document management systems
+
+### 4. Real-time Monitoring Dashboards
+* Aggregations compute metrics (p99 latency, error rate, req/sec) over large datasets in real time
+* Date histogram aggregations power time-series charts
+* Combine search + aggregation: "show me error rate for service=payments in last 24h"
+* **Example**: Kibana dashboards for infrastructure monitoring, APM (Application Performance Monitoring)
+
+### 5. Security / SIEM
+* Ingest events from firewalls, IDS, auth systems — correlate across sources
+* Detect anomalies: unusual login times, access from new IPs, privilege escalation patterns
+* Retention and search across months of audit logs
+* **Example**: Elastic SIEM, Splunk-like threat hunting
+
+### 6. Geo / Location Search
+* Store lat/lon coordinates and query by distance, bounding box, or polygon
+* Combine geo filters with full-text (e.g., "coffee shops within 2km that are open now")
+* **Example**: Zomato / Swiggy finding restaurants near a user, Uber finding nearby drivers
+
+### 7. Autocomplete & Type-ahead Suggestions
+* Completion suggester uses a special in-memory data structure (FST) for sub-millisecond suggestions
+* Search-as-you-type field type indexes n-grams for prefix matching
+* **Example**: Google-style suggestions as users type in a search box
+
+### 8. Recommendation Signals (More-Like-This)
+* Given a document (article, product), find similar ones based on shared terms
+* Used as a lightweight recommendation engine without ML complexity
+* **Example**: "Related articles" sidebar on a blog, "Customers also viewed" on e-commerce
+
 ## Key Features
 
 - **Full-text search**: Advanced text search with relevance scoring

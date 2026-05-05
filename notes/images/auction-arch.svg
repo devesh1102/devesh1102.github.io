@@ -1,0 +1,84 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="460" viewBox="0 0 900 460">
+  <title>Auction System Architecture</title>
+  <defs>
+    <marker id="arr" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto"><polygon points="0 0,10 3.5,0 7" fill="#8b949e"/></marker>
+    <marker id="arrB" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto"><polygon points="0 0,10 3.5,0 7" fill="#58a6ff"/></marker>
+    <marker id="arrO" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto"><polygon points="0 0,10 3.5,0 7" fill="#f0883e"/></marker>
+    <marker id="arrG" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto"><polygon points="0 0,10 3.5,0 7" fill="#3fb950"/></marker>
+  </defs>
+  <rect width="900" height="460" fill="#0d1117"/>
+  <text x="450" y="32" fill="#e6edf3" font-family="Inter,-apple-system,sans-serif" font-size="16" font-weight="700" text-anchor="middle">Auction System — High-Level Architecture</text>
+  <!-- User -->
+  <rect x="20" y="190" width="100" height="50" rx="8" fill="#1f6feb" stroke="#58a6ff" stroke-width="1.5"/>
+  <text x="70" y="211" fill="#e6edf3" font-family="Inter,-apple-system,sans-serif" font-size="12" font-weight="600" text-anchor="middle">User</text>
+  <text x="70" y="228" fill="#cdd9e5" font-family="Inter,-apple-system,sans-serif" font-size="10" text-anchor="middle">POST /bid</text>
+  <!-- API Gateway -->
+  <rect x="165" y="190" width="110" height="50" rx="8" fill="#21262d" stroke="#30363d" stroke-width="1.5"/>
+  <text x="220" y="211" fill="#e6edf3" font-family="Inter,-apple-system,sans-serif" font-size="12" font-weight="600" text-anchor="middle">API Gateway</text>
+  <text x="220" y="228" fill="#8b949e" font-family="Inter,-apple-system,sans-serif" font-size="10" text-anchor="middle">Auth + Rate Limit</text>
+  <!-- Bid Service -->
+  <rect x="325" y="190" width="110" height="50" rx="8" fill="#21262d" stroke="#58a6ff" stroke-width="1.5"/>
+  <text x="380" y="211" fill="#e6edf3" font-family="Inter,-apple-system,sans-serif" font-size="12" font-weight="600" text-anchor="middle">Bid Service</text>
+  <text x="380" y="228" fill="#8b949e" font-family="Inter,-apple-system,sans-serif" font-size="10" text-anchor="middle">Validate + Publish</text>
+  <!-- Kafka -->
+  <rect x="480" y="170" width="140" height="90" rx="8" fill="#2d1f0e" stroke="#f0883e" stroke-width="1.5"/>
+  <text x="550" y="196" fill="#f0883e" font-family="Inter,-apple-system,sans-serif" font-size="13" font-weight="700" text-anchor="middle">Kafka</text>
+  <text x="550" y="214" fill="#8b949e" font-family="Inter,-apple-system,sans-serif" font-size="10" text-anchor="middle">key = auctionId</text>
+  <text x="550" y="230" fill="#3fb950" font-family="Inter,-apple-system,sans-serif" font-size="10" font-weight="600" text-anchor="middle">same auction = same partition</text>
+  <text x="550" y="247" fill="#8b949e" font-family="Inter,-apple-system,sans-serif" font-size="9" text-anchor="middle">(core race condition fix)</text>
+  <!-- Bid Processor -->
+  <rect x="672" y="190" width="130" height="50" rx="8" fill="#161b22" stroke="#58a6ff" stroke-width="2"/>
+  <text x="737" y="211" fill="#e6edf3" font-family="Inter,-apple-system,sans-serif" font-size="12" font-weight="600" text-anchor="middle">Bid Processor</text>
+  <text x="737" y="228" fill="#58a6ff" font-family="Inter,-apple-system,sans-serif" font-size="10" font-weight="600" text-anchor="middle">1 consumer / partition</text>
+  <!-- Redis -->
+  <rect x="620" y="310" width="120" height="55" rx="8" fill="#1a1030" stroke="#a371f7" stroke-width="1.5"/>
+  <text x="680" y="332" fill="#a371f7" font-family="Inter,-apple-system,sans-serif" font-size="12" font-weight="700" text-anchor="middle">Redis</text>
+  <text x="680" y="349" fill="#8b949e" font-family="Inter,-apple-system,sans-serif" font-size="10" text-anchor="middle">Current bid + TTL</text>
+  <text x="680" y="362" fill="#8b949e" font-family="Inter,-apple-system,sans-serif" font-size="9" text-anchor="middle">Lua atomic check+set</text>
+  <!-- PostgreSQL -->
+  <rect x="762" y="310" width="120" height="55" rx="8" fill="#0f2318" stroke="#3fb950" stroke-width="1.5"/>
+  <text x="822" y="332" fill="#3fb950" font-family="Inter,-apple-system,sans-serif" font-size="12" font-weight="700" text-anchor="middle">PostgreSQL</text>
+  <text x="822" y="349" fill="#8b949e" font-family="Inter,-apple-system,sans-serif" font-size="10" text-anchor="middle">Bids + version col</text>
+  <text x="822" y="362" fill="#8b949e" font-family="Inter,-apple-system,sans-serif" font-size="9" text-anchor="middle">Optimistic locking</text>
+  <!-- Kafka results -->
+  <rect x="470" y="310" width="120" height="55" rx="8" fill="#2d1f0e" stroke="#f0883e" stroke-width="1.5"/>
+  <text x="530" y="332" fill="#f0883e" font-family="Inter,-apple-system,sans-serif" font-size="12" font-weight="700" text-anchor="middle">Kafka</text>
+  <text x="530" y="349" fill="#8b949e" font-family="Inter,-apple-system,sans-serif" font-size="10" text-anchor="middle">bid-results topic</text>
+  <text x="530" y="362" fill="#8b949e" font-family="Inter,-apple-system,sans-serif" font-size="9" text-anchor="middle">outbid + won events</text>
+  <!-- Notification -->
+  <rect x="320" y="310" width="120" height="55" rx="8" fill="#21262d" stroke="#30363d" stroke-width="1.5"/>
+  <text x="380" y="332" fill="#e6edf3" font-family="Inter,-apple-system,sans-serif" font-size="12" font-weight="600" text-anchor="middle">Notification</text>
+  <text x="380" y="349" fill="#e6edf3" font-family="Inter,-apple-system,sans-serif" font-size="12" font-weight="600" text-anchor="middle">Service</text>
+  <text x="380" y="363" fill="#8b949e" font-family="Inter,-apple-system,sans-serif" font-size="9" text-anchor="middle">WebSocket push</text>
+  <!-- Users bottom -->
+  <rect x="160" y="310" width="120" height="55" rx="8" fill="#1f6feb" stroke="#58a6ff" stroke-width="1.5"/>
+  <text x="220" y="332" fill="#fff" font-family="Inter,-apple-system,sans-serif" font-size="12" font-weight="600" text-anchor="middle">Watchers</text>
+  <text x="220" y="349" fill="#cdd9e5" font-family="Inter,-apple-system,sans-serif" font-size="10" text-anchor="middle">WebSocket clients</text>
+  <text x="220" y="362" fill="#cdd9e5" font-family="Inter,-apple-system,sans-serif" font-size="9" text-anchor="middle">"You've been outbid!"</text>
+  <!-- Arrows -->
+  <line x1="120" y1="215" x2="163" y2="215" stroke="#8b949e" stroke-width="1.5" marker-end="url(#arr)"/>
+  <line x1="275" y1="215" x2="323" y2="215" stroke="#8b949e" stroke-width="1.5" marker-end="url(#arr)"/>
+  <line x1="435" y1="215" x2="478" y2="215" stroke="#f0883e" stroke-width="1.5" marker-end="url(#arrO)"/>
+  <line x1="620" y1="215" x2="670" y2="215" stroke="#f0883e" stroke-width="1.5" marker-end="url(#arrO)"/>
+  <line x1="737" y1="240" x2="737" y2="275" stroke="#8b949e" stroke-width="1.5"/>
+  <line x1="680" y1="275" x2="737" y2="275" stroke="#8b949e" stroke-width="1.5"/>
+  <line x1="822" y1="275" x2="737" y2="275" stroke="#8b949e" stroke-width="1.5"/>
+  <line x1="680" y1="275" x2="680" y2="308" stroke="#a371f7" stroke-width="1.5" marker-end="url(#arr)"/>
+  <line x1="822" y1="275" x2="822" y2="308" stroke="#3fb950" stroke-width="1.5" marker-end="url(#arr)"/>
+  <line x1="672" y1="235" x2="610" y2="308" stroke="#f0883e" stroke-width="1.5" stroke-dasharray="5,3" marker-end="url(#arrO)"/>
+  <line x1="468" y1="337" x2="442" y2="337" stroke="#f0883e" stroke-width="1.5" marker-end="url(#arr)"/>
+  <line x1="318" y1="337" x2="282" y2="337" stroke="#58a6ff" stroke-width="1.5" marker-end="url(#arrB)"/>
+  <!-- Labels -->
+  <text x="141" y="208" fill="#8b949e" font-family="Inter,-apple-system,sans-serif" font-size="9" text-anchor="middle">REST</text>
+  <text x="299" y="208" fill="#8b949e" font-family="Inter,-apple-system,sans-serif" font-size="9" text-anchor="middle">validate</text>
+  <text x="458" y="208" fill="#f0883e" font-family="Inter,-apple-system,sans-serif" font-size="9" text-anchor="middle">publish</text>
+  <text x="646" y="208" fill="#f0883e" font-family="Inter,-apple-system,sans-serif" font-size="9" text-anchor="middle">consume</text>
+  <text x="636" y="266" fill="#a371f7" font-family="Inter,-apple-system,sans-serif" font-size="9" text-anchor="middle">Lua script</text>
+  <text x="778" y="266" fill="#3fb950" font-family="Inter,-apple-system,sans-serif" font-size="9" text-anchor="middle">opt. lock</text>
+  <text x="600" y="290" fill="#f0883e" font-family="Inter,-apple-system,sans-serif" font-size="9" text-anchor="middle">result event</text>
+  <!-- Legend -->
+  <rect x="20" y="400" width="860" height="44" rx="6" fill="#161b22" stroke="#30363d" stroke-width="1"/>
+  <text x="40" y="420" fill="#8b949e" font-family="Inter,-apple-system,sans-serif" font-size="10" font-weight="700">KEY INSIGHT:</text>
+  <text x="125" y="420" fill="#e6edf3" font-family="Inter,-apple-system,sans-serif" font-size="10">Kafka partitions by auctionId → one Bid Processor per partition → sequential processing → no concurrent writes → no race condition</text>
+  <text x="40" y="436" fill="#8b949e" font-family="Inter,-apple-system,sans-serif" font-size="10">Redis Lua (atomic fast path) + PostgreSQL optimistic locking (version column) provide defense in depth</text>
+</svg>

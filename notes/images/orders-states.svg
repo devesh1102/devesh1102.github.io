@@ -1,0 +1,66 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="360" viewBox="0 0 900 360">
+  <title>Order State Machine</title>
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#8b949e"/>
+    </marker>
+    <marker id="arrow-red" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#f85149"/>
+    </marker>
+    <marker id="arrow-green" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#3fb950"/>
+    </marker>
+    <marker id="arrow-blue" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#58a6ff"/>
+    </marker>
+    <marker id="arrow-orange" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#f0883e"/>
+    </marker>
+  </defs>
+  <!-- background -->
+  <rect width="900" height="360" fill="#0d1117"/>
+  <text x="450" y="30" text-anchor="middle" font-family="Inter, -apple-system, sans-serif" font-size="16" fill="#e6edf3" font-weight="700">Order State Machine</text>
+  <rect x="30.0" y="80" width="108" height="44" rx="8" fill="#1f6feb" stroke="#30363d" stroke-width="1.2"/>
+  <text x="84.0" y="107.0" text-anchor="middle" font-family="Inter, -apple-system, sans-serif" font-size="11" fill="#e6edf3" font-weight="700">PLACED</text>
+  <line x1="138.0" y1="102.0" x2="174.4" y2="102.0" stroke="#8b949e" stroke-width="1.8" marker-end="url(#arrow)"/>
+  <text x="156.2" y="94.0" text-anchor="middle" font-family="Inter, -apple-system, sans-serif" font-size="10" fill="#8b949e">payment success</text>
+  <rect x="115.19999999999999" y="142" width="82" height="16" rx="4" fill="#f0883e" opacity="0.25"/>
+  <text x="156.2" y="154" text-anchor="middle" font-family="Inter, -apple-system, sans-serif" font-size="10" fill="#f0883e">order.placed</text>
+  <rect x="176.4" y="80" width="108" height="44" rx="8" fill="#1f6feb" stroke="#30363d" stroke-width="1.2"/>
+  <text x="230.4" y="100.0" text-anchor="middle" font-family="Inter, -apple-system, sans-serif" font-size="11" fill="#e6edf3" font-weight="700">PAYMENT</text>
+  <text x="230.4" y="116.0" text-anchor="middle" font-family="Inter, -apple-system, sans-serif" font-size="11" fill="#e6edf3" font-weight="700">CONFIRMED</text>
+  <line x1="284.4" y1="102.0" x2="320.8" y2="102.0" stroke="#8b949e" stroke-width="1.8" marker-end="url(#arrow)"/>
+  <text x="302.6" y="94.0" text-anchor="middle" font-family="Inter, -apple-system, sans-serif" font-size="10" fill="#8b949e">restaurant accepts</text>
+  <rect x="246.60000000000002" y="142" width="112" height="16" rx="4" fill="#f0883e" opacity="0.25"/>
+  <text x="302.6" y="154" text-anchor="middle" font-family="Inter, -apple-system, sans-serif" font-size="10" fill="#f0883e">payment.confirmed</text>
+  <rect x="322.8" y="80" width="108" height="44" rx="8" fill="#1f6feb" stroke="#30363d" stroke-width="1.2"/>
+  <text x="376.8" y="107.0" text-anchor="middle" font-family="Inter, -apple-system, sans-serif" font-size="11" fill="#e6edf3" font-weight="700">CONFIRMED</text>
+  <line x1="430.8" y1="102.0" x2="467.20000000000005" y2="102.0" stroke="#8b949e" stroke-width="1.8" marker-end="url(#arrow)"/>
+  <text x="449.0" y="94.0" text-anchor="middle" font-family="Inter, -apple-system, sans-serif" font-size="10" fill="#8b949e">started cooking</text>
+  <rect x="399.0" y="142" width="100" height="16" rx="4" fill="#f0883e" opacity="0.25"/>
+  <text x="449.0" y="154" text-anchor="middle" font-family="Inter, -apple-system, sans-serif" font-size="10" fill="#f0883e">order.confirmed</text>
+  <rect x="469.20000000000005" y="80" width="108" height="44" rx="8" fill="#1f6feb" stroke="#30363d" stroke-width="1.2"/>
+  <text x="523.2" y="107.0" text-anchor="middle" font-family="Inter, -apple-system, sans-serif" font-size="11" fill="#e6edf3" font-weight="700">PREPARING</text>
+  <line x1="577.2" y1="102.0" x2="613.6" y2="102.0" stroke="#8b949e" stroke-width="1.8" marker-end="url(#arrow)"/>
+  <text x="595.4000000000001" y="94.0" text-anchor="middle" font-family="Inter, -apple-system, sans-serif" font-size="10" fill="#8b949e">picked up</text>
+  <rect x="545.4000000000001" y="142" width="100" height="16" rx="4" fill="#f0883e" opacity="0.25"/>
+  <text x="595.4000000000001" y="154" text-anchor="middle" font-family="Inter, -apple-system, sans-serif" font-size="10" fill="#f0883e">order.preparing</text>
+  <rect x="615.6" y="80" width="108" height="44" rx="8" fill="#1f6feb" stroke="#30363d" stroke-width="1.2"/>
+  <text x="669.6" y="100.0" text-anchor="middle" font-family="Inter, -apple-system, sans-serif" font-size="11" fill="#e6edf3" font-weight="700">OUT FOR</text>
+  <text x="669.6" y="116.0" text-anchor="middle" font-family="Inter, -apple-system, sans-serif" font-size="11" fill="#e6edf3" font-weight="700">DELIVERY</text>
+  <line x1="723.6" y1="102.0" x2="760.0" y2="102.0" stroke="#8b949e" stroke-width="1.8" marker-end="url(#arrow)"/>
+  <text x="741.8" y="94.0" text-anchor="middle" font-family="Inter, -apple-system, sans-serif" font-size="10" fill="#8b949e">arrived</text>
+  <rect x="691.8" y="142" width="100" height="16" rx="4" fill="#f0883e" opacity="0.25"/>
+  <text x="741.8" y="154" text-anchor="middle" font-family="Inter, -apple-system, sans-serif" font-size="10" fill="#f0883e">order.delivered</text>
+  <rect x="762.0" y="80" width="108" height="44" rx="8" fill="#3fb950" stroke="#30363d" stroke-width="1.2"/>
+  <text x="816.0" y="107.0" text-anchor="middle" font-family="Inter, -apple-system, sans-serif" font-size="11" fill="#e6edf3" font-weight="700">DELIVERED</text>
+  <rect x="40.0" y="194" width="90" height="40" rx="8" fill="#f85149" stroke="#30363d" stroke-width="1.2"/>
+  <text x="85.0" y="219" text-anchor="middle" font-family="Inter, -apple-system, sans-serif" font-size="12" fill="#e6edf3" font-weight="700">FAILED</text>
+  <line x1="84.0" y1="124" x2="84.0" y2="192" stroke="#f85149" stroke-width="1.8" marker-end="url(#arrow-red)"/>
+  <text x="106.0" y="164" font-family="Inter, -apple-system, sans-serif" font-size="10" fill="#f85149">payment failure</text>
+  <rect x="332.8" y="194" width="100" height="40" rx="8" fill="#f85149" stroke="#30363d" stroke-width="1.2"/>
+  <text x="382.8" y="219" text-anchor="middle" font-family="Inter, -apple-system, sans-serif" font-size="12" fill="#e6edf3" font-weight="700">CANCELLED</text>
+  <line x1="376.8" y1="124" x2="376.8" y2="192" stroke="#f85149" stroke-width="1.8" marker-end="url(#arrow-red)"/>
+  <text x="398.8" y="164" font-family="Inter, -apple-system, sans-serif" font-size="10" fill="#f85149">user cancels</text>
+
+</svg>

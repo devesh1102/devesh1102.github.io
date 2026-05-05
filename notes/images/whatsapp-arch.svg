@@ -1,0 +1,63 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="440" viewBox="0 0 900 440">
+  <title>WhatsApp System Architecture</title>
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#8b949e"/>
+    </marker>
+    <marker id="arrow-red" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#f85149"/>
+    </marker>
+    <marker id="arrow-green" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#3fb950"/>
+    </marker>
+    <marker id="arrow-blue" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#58a6ff"/>
+    </marker>
+    <marker id="arrow-orange" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#f0883e"/>
+    </marker>
+  </defs>
+  <!-- background -->
+  <rect width="900" height="440" fill="#0d1117"/>
+  <text x="450" y="36" text-anchor="middle" font-family="Inter, -apple-system, sans-serif" font-size="17" fill="#e6edf3" font-weight="700">WhatsApp — System Architecture</text>
+  <rect x="30" y="70" width="110" height="48" rx="8" fill="#58a6ff" stroke="#30363d" stroke-width="1.2"/>
+  <text x="85.0" y="99.0" text-anchor="middle" font-family="Inter, -apple-system, sans-serif" font-size="13" fill="#e6edf3" font-weight="600">Client</text>
+  <rect x="195" y="70" width="140" height="48" rx="8" fill="#1f6feb" stroke="#30363d" stroke-width="1.2"/>
+  <text x="265.0" y="93.0" text-anchor="middle" font-family="Inter, -apple-system, sans-serif" font-size="13" fill="#e6edf3" font-weight="600">WS Server A</text>
+  <text x="265.0" y="108.0" text-anchor="middle" font-family="Inter, -apple-system, sans-serif" font-size="11" fill="#8b949e">WebSocket</text>
+  <rect x="400" y="70" width="110" height="48" rx="8" fill="#f0883e" stroke="#30363d" stroke-width="1.2"/>
+  <text x="455.0" y="99.0" text-anchor="middle" font-family="Inter, -apple-system, sans-serif" font-size="13" fill="#e6edf3" font-weight="600">Kafka</text>
+  <rect x="565" y="70" width="140" height="48" rx="8" fill="#21262d" stroke="#30363d" stroke-width="1.2"/>
+  <text x="635.0" y="99.0" text-anchor="middle" font-family="Inter, -apple-system, sans-serif" font-size="13" fill="#58a6ff" font-weight="600">Message Router</text>
+  <line x1="140" y1="94" x2="193" y2="94" stroke="#8b949e" stroke-width="1.8" marker-end="url(#arrow)"/>
+  <text x="166.5" y="85.0" text-anchor="middle" font-family="Inter, -apple-system, sans-serif" font-size="11" fill="#8b949e">WebSocket</text>
+  <line x1="335" y1="94" x2="398" y2="94" stroke="#8b949e" stroke-width="1.8" marker-end="url(#arrow)"/>
+  <text x="366.5" y="85.0" text-anchor="middle" font-family="Inter, -apple-system, sans-serif" font-size="11" fill="#8b949e">publish</text>
+  <line x1="510" y1="94" x2="563" y2="94" stroke="#8b949e" stroke-width="1.8" marker-end="url(#arrow)"/>
+  <rect x="195" y="190" width="140" height="44" rx="8" fill="#a371f7" stroke="#30363d" stroke-width="1.2"/>
+  <text x="265.0" y="211.0" text-anchor="middle" font-family="Inter, -apple-system, sans-serif" font-size="13" fill="#e6edf3" font-weight="600">Redis</text>
+  <text x="265.0" y="226.0" text-anchor="middle" font-family="Inter, -apple-system, sans-serif" font-size="11" fill="#8b949e">Session Cache</text>
+  <line x1="265" y1="118" x2="265" y2="188" stroke="#8b949e" stroke-width="1.8" marker-end="url(#arrow)"/>
+  <text x="635" y="152" text-anchor="middle" font-family="Inter, -apple-system, sans-serif" font-size="11" fill="#8b949e">online</text>
+  <text x="750" y="152" text-anchor="middle" font-family="Inter, -apple-system, sans-serif" font-size="11" fill="#8b949e">offline</text>
+  <rect x="565" y="185" width="140" height="44" rx="8" fill="#1f6feb" stroke="#30363d" stroke-width="1.2"/>
+  <text x="635.0" y="206.0" text-anchor="middle" font-family="Inter, -apple-system, sans-serif" font-size="13" fill="#e6edf3" font-weight="600">WS Server B</text>
+  <text x="635.0" y="221.0" text-anchor="middle" font-family="Inter, -apple-system, sans-serif" font-size="11" fill="#8b949e">WebSocket</text>
+  <rect x="745" y="185" width="130" height="44" rx="8" fill="#3fb950" stroke="#30363d" stroke-width="1.2"/>
+  <text x="810.0" y="206.0" text-anchor="middle" font-family="Inter, -apple-system, sans-serif" font-size="13" fill="#e6edf3" font-weight="600">Cassandra</text>
+  <text x="810.0" y="221.0" text-anchor="middle" font-family="Inter, -apple-system, sans-serif" font-size="11" fill="#8b949e">Offline store</text>
+  <line x1="620" y1="118" x2="620" y2="183" stroke="#8b949e" stroke-width="1.8" marker-end="url(#arrow)"/>
+  <line x1="700" y1="94" x2="760" y2="183" stroke="#8b949e" stroke-width="1.8" marker-end="url(#arrow)"/>
+  <rect x="565" y="295" width="140" height="44" rx="8" fill="#58a6ff" stroke="#30363d" stroke-width="1.2"/>
+  <text x="635.0" y="322.0" text-anchor="middle" font-family="Inter, -apple-system, sans-serif" font-size="13" fill="#e6edf3" font-weight="600">Recipient</text>
+  <line x1="635" y1="229" x2="635" y2="293" stroke="#8b949e" stroke-width="1.8" marker-end="url(#arrow)"/>
+  <rect x="30" y="300" width="14" height="14" rx="3" fill="#1f6feb"/>
+  <text x="50" y="312" font-family="Inter, -apple-system, sans-serif" font-size="12" fill="#8b949e">WebSocket Servers</text>
+  <rect x="30" y="325" width="14" height="14" rx="3" fill="#f0883e"/>
+  <text x="50" y="337" font-family="Inter, -apple-system, sans-serif" font-size="12" fill="#8b949e">Kafka (message bus)</text>
+  <rect x="30" y="350" width="14" height="14" rx="3" fill="#a371f7"/>
+  <text x="50" y="362" font-family="Inter, -apple-system, sans-serif" font-size="12" fill="#8b949e">Redis (presence)</text>
+  <rect x="30" y="375" width="14" height="14" rx="3" fill="#3fb950"/>
+  <text x="50" y="387" font-family="Inter, -apple-system, sans-serif" font-size="12" fill="#8b949e">Cassandra (storage)</text>
+
+</svg>

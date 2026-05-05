@@ -13,6 +13,19 @@
 * Cannot remove elements (standard Bloom filter is write-only)
 * Fixed memory size regardless of number of elements (until capacity reached)
 
+## Storage or Compute?
+
+**Bloom filter is purely a compute/memory structure — it stores NO actual data.**
+
+| Role | Details |
+|---|---|
+| **NOT storage** | Does not store elements. You cannot retrieve what was inserted. |
+| **In-memory structure** | Lives entirely in RAM as a bit array (very small — millions of items in MBs). |
+| **Compute only** | Only answers one question: "Is this element possibly in the set?" |
+| **Always paired with real storage** | DB, cache, or disk is the source of truth. Bloom filter is just the fast pre-filter in front of it. |
+
+> **Rule of thumb**: Bloom filter = bouncer at the door. It quickly rejects people definitely not on the list. The actual guest list (real data) lives elsewhere.
+
 ## Why
 * **Extreme Space Efficiency**: Uses bits instead of storing actual elements
     * Can represent millions of items in a few MB of memory
@@ -73,6 +86,60 @@ The probability of false positives depends on:
 **Example**:
 * 1 million elements, 10 million bits, 7 hash functions → ~1% false positive rate
 * Double the bits → ~0.01% false positive rate
+
+## Common Use Cases
+
+### 1. Web Crawler (Google, Common Crawl)
+* A crawler visits billions of URLs — storing all visited URLs in memory or DB is too expensive
+* Bloom filter holds all seen URLs in a few GB; before queuing a new URL, check the filter
+* If filter says NO → definitely unvisited, add to queue. If YES → likely visited, skip it
+* A rare false positive just means occasionally skipping a new URL — totally acceptable
+* **Scale**: Google's crawler processes billions of URLs; Bloom filter makes this feasible
+
+### 2. Database Storage Engines (Cassandra, RocksDB, LevelDB)
+* Data is stored in SSTables on disk — reading disk for a key that doesn't exist is wasted I/O
+* Each SSTable has a Bloom filter; before a disk read, check if the key *might* be in that file
+* If filter says NO → skip the disk read entirely (saves 99%+ of wasted reads)
+* If filter says YES → do the disk read (might be a false positive, costs one extra read)
+* **Impact**: Dramatically reduces read amplification in LSM-tree storage engines
+
+### 3. CDN / Edge Cache (Akamai, Cloudflare)
+* Edge servers cache popular content; before fetching from origin, check if content is cached
+* Bloom filter at each edge node tells whether a URL is *possibly* in cache
+* Avoids unnecessary cache lookups for content that's definitely not there
+* False positive = do a cache lookup that misses (still faster than hitting origin)
+
+### 4. Chrome Safe Browsing
+* Chrome maintains a local Bloom filter of ~millions of known malicious URLs
+* When you visit a URL, Chrome checks the local filter first — no network call needed
+* If filter says YES → Chrome contacts Google's servers to confirm (handles false positives)
+* If filter says NO → page loads immediately, no server roundtrip
+* **Result**: 99%+ of safe URLs never trigger a server call; privacy preserved
+
+### 5. Email Spam Detection
+* Maintain a Bloom filter of known spam sender addresses / domains
+* Every incoming email is checked against the filter before hitting heavier ML models
+* Fast first-pass eliminates obvious spam cheaply; false positives go to deeper inspection
+* **Example**: Gmail's spam pipeline — Bloom filter as the cheapest first gate
+
+### 6. Recommendation Engine (Medium, Netflix)
+* Don't recommend an article / video the user has already seen
+* Storing every user's full history in memory for fast lookup is expensive at scale
+* Bloom filter per user tracks seen content; check before running recommendation algorithm
+* False positive = occasionally skip recommending something (better than showing duplicates)
+* **Scale**: Medium uses this pattern for hundreds of millions of user-article pairs
+
+### 7. Password Breach Checker (HaveIBeenPwned)
+* Database has billions of leaked password hashes — can't send user's password to a server
+* Bloom filter of all breached hashes lives locally or uses k-anonymity API
+* User's password hash is checked: filter says NO → definitely safe; YES → verify carefully
+* **Privacy**: Actual password never leaves the device in the negative case
+
+### 8. Distributed File Systems (HDFS, Cassandra vnodes)
+* Each node holds a Bloom filter representing the keys/blocks it stores
+* Coordinator node checks filters across nodes to route a query to the right node(s)
+* Eliminates broadcast queries — instead of asking all N nodes, ask only likely candidates
+* **Example**: Cassandra token-aware routing + per-SSTable Bloom filters
 
 ## Common Patterns
 

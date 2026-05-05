@@ -10,6 +10,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet"/>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"/>
   <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     :root {
@@ -93,6 +94,8 @@
     .md tr:hover td { background: var(--bg2); }
     .md hr { border: none; border-top: 1px solid var(--border); margin: 28px 0; }
     .md a { color: var(--accent); }
+    .md .mermaid { background: var(--bg2); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; margin: 16px 0; text-align: center; }
+    .md .mermaid svg { max-width: 100%; height: auto; }
 
     .loading { color: var(--muted); font-size: 14px; padding: 40px 0; }
     .error { color: #f85149; font-size: 14px; padding: 40px 0; }
@@ -142,8 +145,21 @@
         return r.text();
       })
       .then(md => {
-        const html = marked.parse(md);
+        // Configure marked to NOT escape mermaid code blocks
+        const renderer = new marked.Renderer();
+        const originalCode = renderer.code.bind(renderer);
+        renderer.code = function(code, lang) {
+          if (lang === 'mermaid') {
+            return `<div class="mermaid">${code}</div>`;
+          }
+          return originalCode(code, lang);
+        };
+        const html = marked.parse(md, { renderer });
         document.getElementById('content').innerHTML = html;
+
+        // Initialize Mermaid
+        mermaid.initialize({ startOnLoad: false, theme: 'dark', themeVariables: { background: '#161b22', primaryColor: '#1f6feb', primaryTextColor: '#e6edf3', primaryBorderColor: '#30363d', lineColor: '#8b949e', secondaryColor: '#21262d', tertiaryColor: '#0d1117' } });
+        mermaid.run({ nodes: document.querySelectorAll('.mermaid') });
 
         // Update page title
         const h1 = document.querySelector('.md h1');
