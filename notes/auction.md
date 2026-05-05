@@ -78,6 +78,43 @@ flowchart TD
 
 ---
 
+## How Each Flow Works
+
+### Flow 1 — Placing a Bid
+
+A user taps "Place Bid" in the app. That HTTP request hits the **API Gateway** first, which checks the user is authenticated and hasn't exceeded their rate limit (e.g. 10 bids/sec per user). If it passes, the request moves to the **Bid Service**.
+
+The Bid Service does a lightweight sanity check — is the auction ID valid, is the bid amount a number, is the user not banned — and then **publishes the bid to Kafka** using `auctionId` as the partition key. It does NOT write to the database yet. The Bid Service immediately returns a `202 Accepted` to the user, meaning "we got your bid, it's being processed."
+
+Because the partition key is `auctionId`, all bids for the same auction always land on the same Kafka partition, in arrival order. This is the core of the race condition fix.
+
+---
+
+### Flow 2 — Processing the Bid
+
+The **Bid Processor** is a single consumer per Kafka partition. It picks up bids one at a time, in order.
+
+For each bid it does three things in sequence:
+
+**Step A — Redis fast check:** It runs a Lua script against Redis that atomically checks two things: is the auction still open (TTL not expired), and is the new bid higher than the current highest bid stored in Redis? If either check fails, the bid is rejected immediately — no database touch needed. This handles the vast majority of invalid bids at microsecond speed.
+
+**Step B — PostgreSQL write:** If Redis accepts it, the Bid Processor writes the bid to PostgreSQL using an `UPDATE` with an optimistic lock (`WHERE version = $read_version`). This is the durable record. If somehow two bids slipped through (e.g. a misconfigured consumer), the version check catches the second one and rejects it.
+
+**Step C — Publish result:** After the DB write, the Bid Processor publishes a `bid.accepted` or `bid.rejected` event to the **`bid-results` Kafka topic**, including who the previous highest bidder was (so they can be notified they were outbid).
+
+---
+
+### Flow 3 — Real-Time Notification
+
+The **Notification Service** consumes from the `bid-results` topic. When it sees a `bid.accepted` event, it does two pushes over **WebSocket**:
+
+- To the **new highest bidder**: "You're the highest bidder at $120."
+- To the **previous highest bidder**: "You've been outbid! Current highest is $120."
+
+Every user watching the auction (even those not bidding) also receives a live feed update showing the new price. This fan-out is why Kafka is used for notifications too — one event can be consumed by multiple services (notifications, analytics, audit log) without the Bid Processor knowing about any of them.
+
+---
+
 ## Step 4: Deep Dive — The Race Condition
 
 ### The Problem
