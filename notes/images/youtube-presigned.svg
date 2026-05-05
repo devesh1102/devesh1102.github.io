@@ -1,0 +1,75 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="360" viewBox="0 0 900 360">
+  <title>Pre-signed S3 URL vs Direct Server Upload</title>
+  <defs>
+    <marker id="arr" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto"><polygon points="0 0,10 3.5,0 7" fill="#8b949e"/></marker>
+    <marker id="arrR" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto"><polygon points="0 0,10 3.5,0 7" fill="#f85149"/></marker>
+    <marker id="arrG" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto"><polygon points="0 0,10 3.5,0 7" fill="#3fb950"/></marker>
+    <marker id="arrB" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto"><polygon points="0 0,10 3.5,0 7" fill="#58a6ff"/></marker>
+  </defs>
+  <rect width="900" height="360" fill="#0d1117"/>
+  <!-- Left panel: Bad -->
+  <rect x="20" y="20" width="410" height="320" rx="10" fill="#161b22" stroke="#f85149" stroke-width="1.5"/>
+  <rect x="20" y="20" width="410" height="36" rx="10" fill="#2d0f0f"/>
+  <text x="225" y="44" fill="#f85149" font-family="Inter,-apple-system,sans-serif" font-size="13" font-weight="700" text-anchor="middle">Bad — Upload via Your Server</text>
+  <!-- Creator -->
+  <rect x="50" y="100" width="90" height="50" rx="8" fill="#1f6feb" stroke="#58a6ff" stroke-width="1.5"/>
+  <text x="95" y="122" fill="#fff" font-family="Inter,-apple-system,sans-serif" font-size="12" font-weight="600" text-anchor="middle">Creator</text>
+  <text x="95" y="138" fill="#cdd9e5" font-family="Inter,-apple-system,sans-serif" font-size="10" text-anchor="middle">50 GB video</text>
+  <!-- Arrow 1: Creator -> Your Server (fat red) -->
+  <line x1="140" y1="125" x2="205" y2="125" stroke="#f85149" stroke-width="3" marker-end="url(#arrR)"/>
+  <text x="172" y="118" fill="#f85149" font-family="Inter,-apple-system,sans-serif" font-size="10" font-weight="700" text-anchor="middle">50 GB</text>
+  <!-- Your Server (bottleneck) -->
+  <rect x="207" y="100" width="110" height="50" rx="8" fill="#2d0f0f" stroke="#f85149" stroke-width="2"/>
+  <text x="262" y="121" fill="#f85149" font-family="Inter,-apple-system,sans-serif" font-size="12" font-weight="700" text-anchor="middle">Your Server</text>
+  <text x="262" y="137" fill="#f85149" font-family="Inter,-apple-system,sans-serif" font-size="10" text-anchor="middle">BOTTLENECK</text>
+  <!-- Arrow 2: Server -> S3 (fat red) -->
+  <line x1="317" y1="125" x2="355" y2="125" stroke="#f85149" stroke-width="3" marker-end="url(#arrR)"/>
+  <text x="337" y="118" fill="#f85149" font-family="Inter,-apple-system,sans-serif" font-size="10" font-weight="700" text-anchor="middle">50 GB</text>
+  <!-- S3 -->
+  <rect x="357" y="100" width="55" height="50" rx="8" fill="#2d1f0e" stroke="#f0883e" stroke-width="1.5"/>
+  <text x="384" y="121" fill="#f0883e" font-family="Inter,-apple-system,sans-serif" font-size="11" font-weight="700" text-anchor="middle">S3</text>
+  <text x="384" y="137" fill="#8b949e" font-family="Inter,-apple-system,sans-serif" font-size="9" text-anchor="middle">stored</text>
+  <!-- Problems list -->
+  <rect x="40" y="178" width="370" height="140" rx="8" fill="#21262d" stroke="#30363d" stroke-width="1"/>
+  <text x="225" y="200" fill="#f85149" font-family="Inter,-apple-system,sans-serif" font-size="12" font-weight="700" text-anchor="middle">Problems</text>
+  <text x="60" y="222" fill="#8b949e" font-family="Inter,-apple-system,sans-serif" font-size="12">Bandwidth doubled — server receives AND re-uploads</text>
+  <text x="60" y="244" fill="#8b949e" font-family="Inter,-apple-system,sans-serif" font-size="12">Server CPU/memory consumed by file buffering</text>
+  <text x="60" y="266" fill="#8b949e" font-family="Inter,-apple-system,sans-serif" font-size="12">Upload timeout risk on large files (hours long)</text>
+  <text x="60" y="288" fill="#8b949e" font-family="Inter,-apple-system,sans-serif" font-size="12">Scales poorly — every upload needs a fat server</text>
+  <text x="60" y="310" fill="#8b949e" font-family="Inter,-apple-system,sans-serif" font-size="12">Resume on failure? Must rebuild from scratch</text>
+
+  <!-- Right panel: Good -->
+  <rect x="470" y="20" width="410" height="320" rx="10" fill="#161b22" stroke="#3fb950" stroke-width="1.5"/>
+  <rect x="470" y="20" width="410" height="36" rx="10" fill="#0f2318"/>
+  <text x="675" y="44" fill="#3fb950" font-family="Inter,-apple-system,sans-serif" font-size="13" font-weight="700" text-anchor="middle">Good — Pre-Signed S3 URL</text>
+  <!-- Creator -->
+  <rect x="490" y="80" width="90" height="50" rx="8" fill="#1f6feb" stroke="#58a6ff" stroke-width="1.5"/>
+  <text x="535" y="102" fill="#fff" font-family="Inter,-apple-system,sans-serif" font-size="12" font-weight="600" text-anchor="middle">Creator</text>
+  <text x="535" y="118" fill="#cdd9e5" font-family="Inter,-apple-system,sans-serif" font-size="10" text-anchor="middle">50 GB video</text>
+  <!-- Upload Service -->
+  <rect x="640" y="80" width="100" height="50" rx="8" fill="#21262d" stroke="#58a6ff" stroke-width="1.5"/>
+  <text x="690" y="100" fill="#e6edf3" font-family="Inter,-apple-system,sans-serif" font-size="11" font-weight="600" text-anchor="middle">Upload Service</text>
+  <text x="690" y="116" fill="#8b949e" font-family="Inter,-apple-system,sans-serif" font-size="9" text-anchor="middle">your API server</text>
+  <!-- S3 -->
+  <rect x="800" y="140" width="60" height="50" rx="8" fill="#2d1f0e" stroke="#f0883e" stroke-width="1.5"/>
+  <text x="830" y="161" fill="#f0883e" font-family="Inter,-apple-system,sans-serif" font-size="11" font-weight="700" text-anchor="middle">S3</text>
+  <text x="830" y="177" fill="#8b949e" font-family="Inter,-apple-system,sans-serif" font-size="9" text-anchor="middle">stored</text>
+  <!-- Step 1: Creator -> Upload Service (tiny request) -->
+  <line x1="580" y1="100" x2="638" y2="100" stroke="#8b949e" stroke-width="1.5" marker-end="url(#arr)"/>
+  <text x="609" y="93" fill="#8b949e" font-family="Inter,-apple-system,sans-serif" font-size="9" text-anchor="middle">1. GET /upload-url</text>
+  <!-- Step 2: Upload Service -> Creator (pre-signed URL, tiny response) -->
+  <line x1="640" y1="115" x2="582" y2="120" stroke="#58a6ff" stroke-width="1.5" marker-end="url(#arrB)"/>
+  <text x="610" y="132" fill="#58a6ff" font-family="Inter,-apple-system,sans-serif" font-size="9" text-anchor="middle">2. pre-signed URL</text>
+  <!-- Step 3: Creator -> S3 directly (fat green, direct) -->
+  <line x1="535" y1="130" x2="535" y2="155" stroke="#3fb950" stroke-width="1.5"/>
+  <line x1="535" y1="155" x2="798" y2="155" stroke="#3fb950" stroke-width="3" marker-end="url(#arrG)"/>
+  <text x="666" y="148" fill="#3fb950" font-family="Inter,-apple-system,sans-serif" font-size="10" font-weight="700" text-anchor="middle">3. upload 50 GB DIRECTLY to S3</text>
+  <text x="666" y="162" fill="#3fb950" font-family="Inter,-apple-system,sans-serif" font-size="9" text-anchor="middle">your server handles ZERO bytes of file data</text>
+  <!-- Benefits list -->
+  <rect x="490" y="210" width="370" height="110" rx="8" fill="#21262d" stroke="#30363d" stroke-width="1"/>
+  <text x="675" y="232" fill="#3fb950" font-family="Inter,-apple-system,sans-serif" font-size="12" font-weight="700" text-anchor="middle">Benefits</text>
+  <text x="510" y="254" fill="#8b949e" font-family="Inter,-apple-system,sans-serif" font-size="12">Your server only handles a tiny metadata request</text>
+  <text x="510" y="274" fill="#8b949e" font-family="Inter,-apple-system,sans-serif" font-size="12">S3 handles multi-part upload + resume natively</text>
+  <text x="510" y="294" fill="#8b949e" font-family="Inter,-apple-system,sans-serif" font-size="12">Upload Service scales to millions of uploads for free</text>
+  <text x="510" y="314" fill="#8b949e" font-family="Inter,-apple-system,sans-serif" font-size="12">Pre-signed URL expires (e.g. 1hr) — secure by default</text>
+</svg>

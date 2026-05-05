@@ -86,6 +86,8 @@ flowchart TD
 
 ### Why Pre-Signed S3 URL (Direct Upload)?
 
+![Pre-signed S3 URL vs direct server upload](./images/youtube-presigned.svg)
+
 ```mermaid
 flowchart LR
     subgraph "Bad: Upload via your server"
@@ -128,6 +130,9 @@ HLS solution:
 ```
 
 ### HLS Folder Structure in S3
+
+![HLS segments vs single MP4](./images/youtube-hls.svg)
+
 ```mermaid
 flowchart TD
     V["/videos/{videoId}/"] --> M["manifest.m3u8\n(master playlist)"]
