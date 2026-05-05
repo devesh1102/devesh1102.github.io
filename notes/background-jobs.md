@@ -30,51 +30,80 @@
 ## Step 2: Core Patterns
 
 ### Simple Task Queue
-```mermaid
-flowchart LR
-    P([Producer]) -->|Enqueue job| Q[("Queue\n(Redis / SQS)")]
-    Q -->|Poll + process| W1[Worker 1]
-    Q -->|Poll + process| W2[Worker 2]
-    Q -->|Poll + process| W3[Worker N]
-    W1 -->|Success: delete from queue| Q
-    W1 -->|Failure: retry / DLQ| DLQ[(Dead Letter Queue)]
 
-    style P fill:#1f6feb,color:#fff
-    style DLQ fill:#f85149,color:#fff
+![Simple Task Queue](./images/background-jobs-task-queue.svg)
+
+```
+┌──────────┐       ┌────────────────────┐
+│ Producer │──────▶│       Queue        │
+└──────────┘       │   (Redis / SQS)    │
+  enqueue job      └─────────┬──────────┘
+                             │ poll + process
+                 ┌───────────┼───────────┐
+                 ▼           ▼           ▼
+            ┌────────┐  ┌────────┐  ┌────────┐
+            │Worker 1│  │Worker 2│  │Worker N│
+            └────┬───┘  └────────┘  └────────┘
+                 │
+         ┌───────┴──────────┐
+         ▼                  ▼
+   ✅ Success           ❌ Failure
+   delete from queue    retry / DLQ
+                            │
+                            ▼
+                   ┌─────────────────┐
+                   │ Dead Letter Queue│
+                   └─────────────────┘
 ```
 
 > **Tools**: BullMQ (Redis), Sidekiq, Celery, Amazon SQS
 > **Good for**: Moderate volume, single worker type, simple tasks
 
 ### Event-Driven Fan-out (Kafka)
-```mermaid
-flowchart TD
-    P([Producer]) -->|Publish event| K[Kafka Topic]
-    K --> CGA[Consumer Group A\nNotifications]
-    K --> CGB[Consumer Group B\nSearch Index]
-    K --> CGC[Consumer Group C\nAnalytics]
-    K --> CGD[Consumer Group D\nAudit Log]
 
-    style P fill:#1f6feb,color:#fff
-    style K fill:#f0883e,color:#fff
+![Event-Driven Fan-out](./images/background-jobs-fanout.svg)
+
+```
+┌──────────┐       ┌─────────────────┐
+│ Producer │──────▶│   Kafka Topic   │
+└──────────┘       └────────┬────────┘
+  publish event             │
+              ┌─────────────┼─────────────┬─────────────┐
+              ▼             ▼             ▼             ▼
+      ┌──────────────┐ ┌──────────────┐ ┌──────────┐ ┌──────────┐
+      │ Consumer     │ │ Consumer     │ │ Consumer │ │ Consumer │
+      │ Group A      │ │ Group B      │ │ Group C  │ │ Group D  │
+      │ Notifications│ │ Search Index │ │Analytics │ │Audit Log │
+      └──────────────┘ └──────────────┘ └──────────┘ └──────────┘
 ```
 
 > Each consumer group processes independently at its own pace.
 > **Good for**: Microservices, multiple downstream actions, high throughput
 
 ### Workflow / DAG (Multi-step with Dependencies)
-```mermaid
-flowchart TD
-    A[video.uploaded] --> B[Transcode 360p]
-    A --> C[Transcode 720p]
-    A --> D[Gen Thumbnail]
-    B --> E{All done?}
-    C --> E
-    D --> E
-    E -->|Yes| F[Mark READY\nNotify Creator]
 
-    style A fill:#f0883e,color:#fff
-    style F fill:#3fb950,color:#fff
+![Workflow DAG](./images/background-jobs-workflow-dag.svg)
+
+```
+                   ┌──────────────────┐
+                   │  video.uploaded  │
+                   └────────┬─────────┘
+          ┌─────────────────┼──────────────────┐
+          ▼                 ▼                  ▼
+ ┌────────────────┐ ┌───────────────┐ ┌────────────────┐
+ │ Transcode 360p │ │Transcode 720p │ │ Gen Thumbnail  │
+ └───────┬────────┘ └───────┬───────┘ └───────┬────────┘
+         └─────────────────┬┘─────────────────┘
+                           ▼
+                    ┌─────────────┐
+                    │  All done?  │
+                    └──────┬──────┘
+                           │ Yes
+                           ▼
+                ┌───────────────────────┐
+                │  Mark READY           │
+                │  Notify Creator       │
+                └───────────────────────┘
 ```
 
 > **Tools**: Apache Airflow, Temporal, AWS Step Functions
@@ -126,19 +155,35 @@ Rule: NEVER silently drop a failed job. Always route to DLQ.
 
 ## Step 4: Idempotency — The Most Critical Property
 
-```mermaid
-flowchart TD
-    W[Worker picks up job] --> P[Process 90%]
-    P --> C[Worker crashes]
-    C --> R[Job re-queued automatically]
-    R --> W2[New worker picks up same job]
-    W2 --> I{Is job idempotent?}
-    I -->|Yes| OK[Safe to re-run]
-    I -->|No| BAD[Email sent twice or User charged twice]
+![Idempotency Flow](./images/background-jobs-idempotency.svg)
 
-    style OK fill:#3fb950,color:#fff
-    style BAD fill:#f85149,color:#fff
-    style C fill:#f85149,color:#fff
+```
+┌──────────────────────┐
+│  Worker picks up job │
+└──────────┬───────────┘
+           ▼
+┌──────────────────────┐
+│    Process 90%...    │
+└──────────┬───────────┘
+           ▼
+┌──────────────────────┐
+│  Worker crashes ❌   │
+└──────────┬───────────┘
+           ▼
+┌──────────────────────┐
+│  Job re-queued auto  │
+└──────────┬───────────┘
+           ▼
+┌──────────────────────┐
+│ New worker picks up  │
+└──────────┬───────────┘
+           ▼
+     Is job idempotent?
+       /             \
+     Yes              No
+      ▼                ▼
+✅ Safe to re-run   ❌ Email sent twice!
+                       User charged twice!
 ```
 
 **Techniques to achieve idempotency:**
@@ -162,29 +207,28 @@ flowchart TD
 
 ## Step 5: Job Status Tracking
 
-```mermaid
-sequenceDiagram
-    participant Client
-    participant API
-    participant Queue
-    participant Worker
-    participant DB
+![Job Status Tracking](./images/background-jobs-job-status.svg)
 
-    Client->>API: POST /generate-report
-    API->>DB: INSERT job {status: PENDING}
-    API->>Queue: Enqueue job
-    API-->>Client: 202 Accepted {jobId: "abc123"}
-
-    Worker->>Queue: Poll
-    Queue-->>Worker: Job abc123
-    Worker->>DB: UPDATE job {status: IN_PROGRESS}
-    Worker->>Worker: Process (takes 30s...)
-    Worker->>DB: UPDATE job {status: DONE, result: "s3://..."}
-
-    Client->>API: GET /jobs/abc123
-    API->>DB: SELECT status, result
-    DB-->>API: {status: DONE, result: "s3://..."}
-    API-->>Client: Download link
+```
+  Client         API          Queue        Worker          DB
+    │              │              │             │            │
+    │─POST /job───▶│              │             │            │
+    │              │─────────────────────────────────INSERT─▶│
+    │              │              │             │   PENDING  │
+    │              │──Enqueue────▶│             │            │
+    │◀─202 Accepted│              │             │            │
+    │  {jobId}     │              │             │            │
+    │              │              │◀────Poll────│            │
+    │              │              │────Job─────▶│            │
+    │              │              │    abc123   │─UPDATE─────▶│
+    │              │              │             │ IN_PROGRESS │
+    │              │              │             │  (30s...)   │
+    │              │              │             │─UPDATE─────▶│
+    │              │              │             │    DONE     │
+    │─GET /jobs/id▶│              │             │            │
+    │              │─────────────────────────────────SELECT─▶│
+    │◀─Download────│              │             │            │
+    │  Link        │              │             │            │
 ```
 
 ---
