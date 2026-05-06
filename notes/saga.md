@@ -139,6 +139,143 @@ Both writes happen atomically in one DB transaction. A separate **Outbox Poller*
 
 ---
 
+## Kafka as the Event Bus in Choreography Sagas
+
+In a choreography saga, services don't call each other — they publish events and react to events. **Kafka is the standard transport for this**. But Kafka isn't just a message queue here — its partition model is what gives you the sequential ordering that sagas depend on.
+
+---
+
+### Why ordering matters in a Saga
+
+A saga is a sequence of steps. Step 2 must happen after step 1. Step 3 must happen after step 2. If events are processed out of order — say `payment.confirmed` is processed before `order.created` — the consumer has no context and the saga breaks.
+
+With a naive pub/sub (like Redis Pub/Sub), ordering isn't guaranteed across consumers. Kafka solves this with **partition-level ordering**: all messages within one partition are consumed strictly in the order they were written.
+
+---
+
+### The key — partition by saga/order ID
+
+![Kafka Partition by Order ID](./images/saga-kafka-partition.svg)
+
+Every service publishes to the **same Kafka topic** (e.g., `saga-events`) using the **order_id as the partition key**:
+
+```
+kafka.publish(
+    topic = "saga-events",
+    key   = order_id,       ← this determines the partition
+    value = { event: "order.created", order_id: 101, ... }
+)
+```
+
+Kafka hashes the key: `partition = hash(order_id) % num_partitions`
+
+**The result**: all events for `order_101` — whether published by Order Service, Payment Service, or Delivery Service — land on the **same partition**. And within a partition, Kafka guarantees strict ordering.
+
+```
+Partition 1 receives (in this exact order):
+  [offset 0] order.created       → consumed by Payment Service
+  [offset 1] payment.confirmed   → consumed by Restaurant Service
+  [offset 2] order.confirmed     → consumed by Delivery Service
+  [offset 3] order.out_for_delivery → consumed by Tracking Service
+```
+
+No consumer ever sees `payment.confirmed` before it sees `order.created` for the same order. The sequence is enforced by the partition.
+
+---
+
+### How each service participates
+
+![Kafka Saga Event Flow](./images/saga-kafka-flow.svg)
+
+Every service in the saga is both a **producer** and a **consumer** on the same topic:
+
+- **Produces** when it completes its step (publishes the next event)
+- **Consumes** events it needs to react to (filtered by event type)
+
+```
+Payment Service consumer loop:
+  for event in kafka.consume("saga-events"):
+      if event.type == "order.created":
+          charge_card(event.order_id)
+          kafka.publish("saga-events", key=event.order_id,
+                        value={ type: "payment.confirmed", ... })
+      else:
+          skip  ← ignore events meant for other services
+```
+
+Each service only processes the event types it cares about and skips the rest. This is called **selective consumption** — it's simple and keeps services decoupled.
+
+---
+
+### Why Kafka and not Redis Pub/Sub for Sagas?
+
+This is the critical difference from WhatsApp's use of Redis Pub/Sub:
+
+| | Redis Pub/Sub | Kafka |
+|---|---|---|
+| Delivery | At-most-once (fire and forget) | At-least-once (persisted to disk) |
+| Ordering | Not guaranteed | Guaranteed within a partition |
+| Replay | Not possible (no storage) | Yes — consumers can reset offset and reprocess |
+| Consumer crash recovery | Message lost | Consumer re-reads from last committed offset |
+| Use in Saga | ❌ Too risky — lost events = broken saga | ✅ Safe — every event is durable and ordered |
+
+In WhatsApp, a dropped Pub/Sub message is acceptable because the Inbox table is the safety net. In a Saga, **a dropped event means a stuck saga** — the order sits in `PAYMENT_CONFIRMED` forever because the Restaurant Service never heard about it. Kafka's durability and replay make this impossible.
+
+---
+
+### Consumer groups and parallel processing
+
+Each service runs as a **consumer group**. Kafka assigns partitions to consumers within the group:
+
+```
+saga-events topic — 4 partitions
+Payment Service consumer group — 2 consumers
+  Consumer 1 handles: Partition 0, Partition 1
+  Consumer 2 handles: Partition 2, Partition 3
+```
+
+This means two orders on different partitions are processed **in parallel** by different consumers — no head-of-line blocking. But two events for the **same order** on the same partition are always processed by the **same consumer**, in order.
+
+This is the elegance of the design: you get parallelism across orders AND sequential ordering within each order, for free, from the partition model.
+
+---
+
+### Idempotency — handling at-least-once delivery
+
+Kafka guarantees at-least-once delivery — a consumer might receive the same event twice (e.g., consumer crashes after processing but before committing offset). Every saga consumer must be **idempotent**:
+
+```sql
+-- Before processing, check if already handled
+SELECT * FROM processed_events WHERE event_id = ?
+-- Found → skip (already processed, return cached result)
+-- Not found → process + insert event_id
+```
+
+Store `event_id` in the consumer's own DB. This turns at-least-once into effectively-exactly-once from the business logic perspective.
+
+---
+
+### What happens on consumer failure?
+
+Consumer crashes mid-saga step. Since Kafka retains the message and tracks the consumer's **committed offset**, the consumer restarts and re-reads the last unprocessed event:
+
+```
+Partition 1 offsets:
+  [0] order.created         ← committed (processed)
+  [1] payment.confirmed     ← NOT committed (consumer crashed here)
+  [2] order.confirmed       ← not yet
+
+On restart → consumer re-reads from offset 1
+           → processes payment.confirmed again
+           → idempotency check skips the duplicate DB write
+           → commits offset 1
+           → moves to offset 2
+```
+
+No events are lost. The saga continues exactly where it left off.
+
+---
+
 ## Real-World Example — Orders App
 
 The orders app uses **Choreography** style:
