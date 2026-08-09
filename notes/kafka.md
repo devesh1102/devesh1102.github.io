@@ -592,9 +592,9 @@ There is no free lunch. You pick one — unless you use partition keys.
 
 Route all events for the same entity to the **same partition** using a key:
 
-```java
-producer.send(new ProducerRecord("topic", userId, event));
-//                                          ^^^^^^ key determines partition
+```python
+producer.send("topic", key=user_id, value=event)
+#                      ^^^ key determines partition
 ```
 
 ```
