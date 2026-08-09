@@ -1,0 +1,31 @@
+graph LR
+    Client["🧑 Client\n(Browser/App)"]
+    CDN["CDN\n(Static Assets)"]
+    LB["Load Balancer"]
+    EventSvc["Event Service"]
+    SearchSvc["Search Service"]
+    BookingSvc["Booking Service"]
+    UserSvc["User Service"]
+    EventDB[("Event DB\n(PostgreSQL)")]
+    SearchIdx[("Search Index\n(Elasticsearch)")]
+    BookingDB[("Booking DB\n(PostgreSQL)")]
+    SeatLock[("Seat Lock\n(Redis)")]
+    Queue["Queue\n(Kafka)"]
+    Cache["Read Cache\n(Redis)"]
+    NotifSvc["Notification\nService"]
+
+    Client -->|"static"| CDN
+    Client -->|"API calls"| LB
+    LB --> EventSvc
+    LB --> SearchSvc
+    LB --> BookingSvc
+    EventSvc --> EventDB
+    EventSvc --> Cache
+    EventSvc -->|"index event"| Queue
+    SearchSvc --> SearchIdx
+    Queue -->|"update index"| SearchIdx
+    BookingSvc --> BookingDB
+    BookingSvc --> SeatLock
+    BookingSvc -->|"booking confirmed"| Queue
+    Queue --> NotifSvc
+    UserSvc --> BookingDB

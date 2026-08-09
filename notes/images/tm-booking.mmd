@@ -1,0 +1,30 @@
+sequenceDiagram
+    participant U as User
+    participant BS as Booking Service
+    participant Redis as Redis (Seat Lock)
+    participant DB as Booking DB
+    participant Q as Kafka
+    participant N as Notification Svc
+
+    U->>BS: POST /book {eventId, seatId, userId}
+    BS->>Redis: SET lock:seat:seatId userId NX EX 600
+    alt lock acquired
+        Redis-->>BS: OK
+        BS->>DB: INSERT booking (PENDING, idempotency_key)
+        DB-->>BS: booking_id
+        BS->>BS: Process Payment
+        alt payment success
+            BS->>DB: UPDATE booking → CONFIRMED
+            BS->>Redis: DEL lock:seat:seatId
+            BS->>Q: publish booking.confirmed
+            Q->>N: send confirmation email/push
+            BS-->>U: 200 booking_id
+        else payment failed
+            BS->>DB: UPDATE booking → FAILED
+            BS->>Redis: DEL lock:seat:seatId
+            BS-->>U: 402 Payment Failed
+        end
+    else lock not acquired
+        Redis-->>BS: nil (seat taken)
+        BS-->>U: 409 Seat Unavailable
+    end

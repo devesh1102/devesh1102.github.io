@@ -1,0 +1,26 @@
+sequenceDiagram
+    participant R as Rider App
+    participant RS as Ride Service
+    participant MS as Match Service
+    participant LS as Location Store (Redis)
+    participant Maps as Maps Service
+    participant D as Driver App
+    participant NS as Notification Service
+
+    R->>RS: POST /ride/request {pickupLat, pickupLng, dropLat, dropLng}
+    RS->>MS: findNearbyDrivers(pickupLat, pickupLng, radius=2km)
+    MS->>LS: GEORADIUS drivers pickupLat pickupLng 2km
+    LS-->>MS: [driverId1, driverId2, driverId3] with distances
+    MS->>Maps: getETA(driverLocations, pickupLocation)
+    Maps-->>MS: ETAs per driver
+    MS-->>RS: ranked driver list (by ETA + rating)
+    RS->>NS: push offer to top driver
+    NS->>D: "New ride request — Accept?"
+    alt driver accepts (within 15s)
+        D->>RS: POST /ride/accept {rideId, driverId}
+        RS->>LS: update ride status → MATCHED
+        RS-->>R: 200 {driverId, ETA, driverDetails}
+    else driver rejects or timeout
+        RS->>NS: push offer to next driver
+        Note over RS,D: repeat until accepted or no drivers
+    end

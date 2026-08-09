@@ -1,0 +1,25 @@
+graph LR
+    Client["🧑 Client\n(Browser/App)"]
+    LB["Load Balancer"]
+    BookingSvc["Booking Service"]
+    PaymentSvc["Payment Service\n(external)"]
+    BookingDB[("Booking DB\n(PostgreSQL)")]
+    SeatLock["Redis\nSeat Lock\nSET NX EX 600"]
+    Cache["Read Cache\n(Redis)\nseat:event:id"]
+    Queue["Kafka\nbooking.confirmed\nbooking.failed"]
+    NotifSvc["Notification Service\n(email / push)"]
+    EventDB[("Event DB\n(PostgreSQL)\nseats table)")]
+
+    Client -->|"POST /book\n{eventId, seatId, userId}"| LB
+    LB --> BookingSvc
+    BookingSvc -->|"SET lock:seat:id NX EX 600"| SeatLock
+    SeatLock -->|"nil → 409 Seat Taken"| BookingSvc
+    SeatLock -->|"OK → lock acquired"| BookingSvc
+    BookingSvc -->|"INSERT booking PENDING\n+ idempotency_key"| BookingDB
+    BookingSvc -->|"charge card"| PaymentSvc
+    PaymentSvc -->|"success / failure"| BookingSvc
+    BookingSvc -->|"UPDATE seats → BOOKED\nUPDATE booking → CONFIRMED"| EventDB
+    BookingSvc -->|"DEL lock:seat:id\nINVALIDATE seat cache"| SeatLock
+    BookingSvc -->|"INVALIDATE seat:event:id"| Cache
+    BookingSvc -->|"publish booking.confirmed"| Queue
+    Queue --> NotifSvc

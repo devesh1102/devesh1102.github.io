@@ -1,0 +1,35 @@
+sequenceDiagram
+    participant U as User
+    participant BS as Booking Service
+    participant R as Redis
+    participant DB as PostgreSQL
+    participant K as Kafka
+    participant P as Payment Service
+    participant CS as Cancel Service
+
+    U->>BS: POST /book {hotelId, roomId, checkIn, checkOut, userId}
+    BS->>R: Lua script: SET NX lock:room:r1:Jun5 .. Jun9 EX 600
+    alt any lock fails
+        R-->>BS: nil
+        BS-->>U: 409 Room Unavailable
+    else all locks acquired
+        R-->>BS: OK (5 locks set)
+        BS->>DB: INSERT booking {status: PENDING, idempotency_key}
+        DB-->>BS: bookingId
+        BS->>K: publish {bookingId, amount, userId}
+        K->>P: process payment
+        alt payment success
+            P-->>BS: success
+            BS->>DB: UPDATE availability → BOOKED (Jun5-Jun9)
+            BS->>DB: UPDATE booking → CONFIRMED
+            BS->>R: DEL 5 night locks
+            BS->>R: DECRBY avail:hotel:h456 5
+            BS->>R: if counter=0 → ZREM hotel from geo index
+            BS-->>U: 200 bookingId
+        else payment failure
+            P-->>CS: failure
+            CS->>DB: UPDATE booking → FAILED
+            CS->>R: DEL 5 night locks
+            CS-->>U: 402 Payment Failed
+        end
+    end

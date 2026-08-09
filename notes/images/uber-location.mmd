@@ -1,0 +1,18 @@
+graph LR
+    DriverApp["🚗 Driver App\n(sends GPS every 5s)"]
+    LB["Load Balancer"]
+    LocationSvc["Location Service"]
+    Redis["Redis\nGEOADD drivers lng lat driverId\nTTL 30s per driver"]
+    Kafka["Kafka\nlocation.updated"]
+    TripSvc["Trip Service\n(live trip tracking)"]
+    RiderApp["🧑 Rider App\n(WebSocket / polling)"]
+    WSSvc["WebSocket Server"]
+
+    DriverApp -->|"PATCH /driver/location\n{lat, lng, heading}"| LB
+    LB --> LocationSvc
+    LocationSvc -->|"GEOADD + EXPIRE 30s"| Redis
+    LocationSvc -->|"publish location.updated\n{driverId, lat, lng}"| Kafka
+    Kafka -->|"consume (active trips only)"| TripSvc
+    TripSvc -->|"push to rider"| WSSvc
+    WSSvc -->|"WebSocket push"| RiderApp
+    Redis -->|"GEORADIUS query\n(driver matching)"| LocationSvc

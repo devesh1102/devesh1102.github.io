@@ -1,0 +1,28 @@
+sequenceDiagram
+    participant ES as Event Service
+    participant K1 as Kafka (event.occurred)
+    participant FS as Fan-out Service
+    participant DB as Subscriber DB
+    participant K2 as Kafka (notif.push / notif.email)
+    participant NS as Notification Service
+    participant APNS as APNs / FCM
+
+    ES->>K1: publish {eventId: "e123", eventType: "NEW_VIDEO"}
+    K1->>FS: consume event
+    FS->>DB: SELECT user_id, device_token FROM subscribers\nWHERE event_id = "e123" (batches of 1000)
+    DB-->>FS: [userId1, userId2, ... userId5M]
+    loop for each user batch
+        FS->>K2: publish {notifId, userId, deviceToken, message}
+    end
+    K2->>NS: consume notification message
+    NS->>NS: check Redis SET sent:notifId NX
+    alt already sent
+        NS-->>NS: skip (duplicate)
+    else not sent
+        NS->>APNS: send push {deviceToken, payload}
+        alt APNs success
+            APNS-->>NS: 200 OK
+        else APNs failure
+            NS->>K2: publish to notif.retry\n{notifId, attempt: 1}
+        end
+    end

@@ -1,0 +1,11 @@
+graph LR
+    PricingSvc["Pricing Service"]
+    Redis["Redis\nmultiplier:location:NYC → 1.5\nmultiplier:tier:luxury → 2.0\nmultiplier:location:London → 1.3"]
+    SearchSvc["Search Service"]
+    Formula["final_price =\nbase_price\n× location_multiplier\n× tier_multiplier\n× demand_factor"]
+    User["User sees\nfresh price"]
+
+    PricingSvc -->|"SET multipliers\n(updated anytime)"| Redis
+    SearchSvc -->|"GET multipliers"| Redis
+    Redis -->|"multipliers"| Formula
+    Formula --> User

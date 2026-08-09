@@ -1,0 +1,106 @@
+<svg viewBox="0 0 900 550" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <style>
+      .box { fill: #1f6feb; stroke: #58a6ff; stroke-width: 2; }
+      .text { fill: #e6edf3; font-family: Arial, sans-serif; font-size: 13px; }
+      .title { font-weight: bold; font-size: 14px; }
+      .bit-off { fill: #30363d; stroke: #58a6ff; stroke-width: 1.5; }
+      .bit-on { fill: #3fb950; stroke: #3fb950; stroke-width: 1.5; }
+      .arrow { stroke: #58a6ff; stroke-width: 2; fill: none; marker-end: url(#arrowhead); }
+      .hash-box { fill: #a371f7; }
+    </style>
+    <marker id="arrowhead" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto">
+      <polygon points="0 0, 10 3, 0 6" fill="#58a6ff" />
+    </marker>
+  </defs>
+
+  <!-- Title -->
+  <text x="450" y="25" class="text title" text-anchor="middle" style="font-size: 15px;">Adding Element to Bloom Filter</text>
+
+  <!-- Element -->
+  <rect x="350" y="40" width="200" height="40" class="hash-box" rx="5" />
+  <text x="450" y="65" class="text title" text-anchor="middle">Element: "apple"</text>
+
+  <!-- Arrow -->
+  <path d="M 450 80 L 450 105" class="arrow" />
+
+  <!-- Hash Functions -->
+  <text x="20" y="130" class="text title">Hash Functions:</text>
+
+  <!-- Hash 1 -->
+  <rect x="20" y="140" width="130" height="50" class="hash-box" rx="3" />
+  <text x="85" y="160" class="text title" text-anchor="middle">h1("apple")</text>
+  <text x="85" y="178" class="text" text-anchor="middle">→ index 3</text>
+
+  <!-- Hash 2 -->
+  <rect x="170" y="140" width="130" height="50" class="hash-box" rx="3" />
+  <text x="235" y="160" class="text title" text-anchor="middle">h2("apple")</text>
+  <text x="235" y="178" class="text" text-anchor="middle">→ index 7</text>
+
+  <!-- Hash 3 -->
+  <rect x="320" y="140" width="130" height="50" class="hash-box" rx="3" />
+  <text x="385" y="160" class="text title" text-anchor="middle">h3("apple")</text>
+  <text x="385" y="178" class="text" text-anchor="middle">→ index 12</text>
+
+  <!-- Arrows -->
+  <path d="M 85 190 L 85 220" class="arrow" />
+  <path d="M 235 190 L 235 220" class="arrow" />
+  <path d="M 385 190 L 385 220" class="arrow" />
+
+  <!-- Bit Array -->
+  <text x="20" y="245" class="text title">Bit Array (m=16):</text>
+  
+  <!-- Before -->
+  <text x="20" y="268" class="text">Before:</text>
+  <g id="bits-before">
+    <circle cx="50" cy="280" r="8" class="bit-off" />
+    <circle cx="70" cy="280" r="8" class="bit-off" />
+    <circle cx="90" cy="280" r="8" class="bit-off" />
+    <circle cx="110" cy="280" r="8" class="bit-off" />
+    <circle cx="130" cy="280" r="8" class="bit-off" />
+    <circle cx="150" cy="280" r="8" class="bit-off" />
+    <circle cx="170" cy="280" r="8" class="bit-off" />
+    <circle cx="190" cy="280" r="8" class="bit-off" />
+    <circle cx="210" cy="280" r="8" class="bit-off" />
+    <circle cx="230" cy="280" r="8" class="bit-off" />
+    <circle cx="250" cy="280" r="8" class="bit-off" />
+    <circle cx="270" cy="280" r="8" class="bit-off" />
+    <circle cx="290" cy="280" r="8" class="bit-off" />
+    <circle cx="310" cy="280" r="8" class="bit-off" />
+    <circle cx="330" cy="280" r="8" class="bit-off" />
+    <circle cx="350" cy="280" r="8" class="bit-off" />
+    <text x="375" y="285" class="text">[all 0s]</text>
+  </g>
+
+  <!-- After -->
+  <text x="20" y="320" class="text">After adding "apple":</text>
+  <g id="bits-after">
+    <circle cx="50" cy="332" r="8" class="bit-off" />
+    <circle cx="70" cy="332" r="8" class="bit-off" />
+    <circle cx="90" cy="332" r="8" class="bit-off" />
+    <circle cx="110" cy="332" r="8" class="bit-on" />
+    <text x="130" y="337" class="text" style="font-size: 11px;">↑ bit[3]</text>
+    <circle cx="160" cy="332" r="8" class="bit-off" />
+    <circle cx="180" cy="332" r="8" class="bit-off" />
+    <circle cx="200" cy="332" r="8" class="bit-on" />
+    <text x="220" y="337" class="text" style="font-size: 11px;">↑ bit[7]</text>
+    <circle cx="250" cy="332" r="8" class="bit-off" />
+    <circle cx="270" cy="332" r="8" class="bit-off" />
+    <circle cx="290" cy="332" r="8" class="bit-off" />
+    <circle cx="310" cy="332" r="8" class="bit-on" />
+    <text x="330" y="337" class="text" style="font-size: 11px;">↑ bit[12]</text>
+    <circle cx="360" cy="332" r="8" class="bit-off" />
+  </g>
+
+  <!-- Summary -->
+  <rect x="20" y="370" width="860" height="160" class="box" rx="5" />
+  <text x="450" y="395" class="text title" text-anchor="middle" style="font-size: 14px;">Summary</text>
+  
+  <text x="40" y="420" class="text title">To add "apple":</text>
+  <text x="60" y="437" class="text">1. Hash element "apple" with k=3 hash functions</text>
+  <text x="60" y="454" class="text">2. Get indices: 3, 7, 12</text>
+  <text x="60" y="471" class="text">3. Set bits at positions 3, 7, 12 to 1</text>
+  
+  <text x="40" y="498" class="text title">Space cost:</text>
+  <text x="60" y="515" class="text">✓ Only 3 bits set (vs entire element stored)</text>
+</svg>

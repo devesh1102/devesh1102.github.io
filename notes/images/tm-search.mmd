@@ -1,0 +1,20 @@
+graph LR
+    Client["Client"]
+    SS["Search Service"]
+    ES["Elasticsearch\n(events index)"]
+    EventDB[("Event DB\n(PostgreSQL)")]
+    Cache["Redis Cache\n(popular searches)"]
+    Queue["Kafka"]
+    Indexer["Indexer\n(Kafka consumer)"]
+
+    Client -->|"GET /search?q=taylor+swift&city=NYC"| SS
+    SS -->|"check cache"| Cache
+    Cache -->|"HIT → return"| SS
+    SS -->|"MISS: full-text search"| ES
+    ES -->|"ranked results"| SS
+    SS -->|"cache result (TTL 60s)"| Cache
+    SS -->|"results"| Client
+
+    EventDB -->|"event created/updated"| Queue
+    Queue -->|"consume"| Indexer
+    Indexer -->|"index document"| ES

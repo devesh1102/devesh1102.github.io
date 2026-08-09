@@ -1,0 +1,27 @@
+graph LR
+    Admin["🛠️ Admin\n(Event Coordinator)"]
+    Client["🧑 Client\n(Browser/App)"]
+    CDN["CDN\n(Static Assets)"]
+    LB["Load Balancer"]
+    EventSvc["Event Service"]
+    SearchSvc["Search Service"]
+    EventDB[("Event DB\n(PostgreSQL)")]
+    Cache["Read Cache\n(Redis)\nseat:event:id → seat map"]
+    Queue["Kafka\nevent.created\nevent.updated"]
+    Indexer["Indexer\n(Kafka Consumer)"]
+    SearchIdx[("Elasticsearch\nevents index)")]
+
+    Client -->|"GET /events\nGET /events/:id/seats"| LB
+    Client -->|"GET /search?q=..."| LB
+    Admin -->|"POST /events\n(create event + seats)"| LB
+    Client -->|"static assets"| CDN
+    LB --> EventSvc
+    LB --> SearchSvc
+    EventSvc -->|"read/write"| EventDB
+    EventSvc -->|"cache seat map\nTTL 30s"| Cache
+    Cache -->|"HIT → fast return"| EventSvc
+    EventSvc -->|"publish event.created"| Queue
+    Queue -->|"consume"| Indexer
+    Indexer -->|"upsert document"| SearchIdx
+    SearchSvc -->|"full-text + faceted query"| SearchIdx
+    SearchSvc -->|"cache popular queries\nTTL 60s"| Cache

@@ -1,0 +1,37 @@
+graph LR
+    User["🧑 User"]
+    Owner["🏨 Hotel Owner"]
+    GW["API Gateway\nAuth + Rate Limiter"]
+    SearchSvc["Search Service"]
+    HotelSvc["Hotel Service"]
+    BookingSvc["Booking Service"]
+    PricingSvc["Pricing Service"]
+    CancelSvc["Cancel Service"]
+    PayQ["Kafka\nbooking.payment"]
+    DB[("PostgreSQL\nhotels / rooms\navailability / bookings")]
+    Redis["Redis\nGeospatial index\navail:hotel:id counter\nmultipliers\nlocks"]
+    ES["Elasticsearch\n(optional: rich search)"]
+    S3["S3\nHotel images"]
+    Payment["Payment Service\n(external)"]
+
+    User -->|"search / book"| GW
+    Owner -->|"register hotel\nadd rooms"| GW
+    GW --> SearchSvc
+    GW --> HotelSvc
+    GW --> BookingSvc
+    HotelSvc -->|"write hotel + rooms"| DB
+    HotelSvc -->|"GEOADD hotel\nSET avail counter"| Redis
+    HotelSvc -->|"upload images"| S3
+    HotelSvc -->|"index hotel doc"| ES
+    SearchSvc -->|"GEORADIUS nearby hotels"| Redis
+    SearchSvc -->|"GET hotel details"| DB
+    SearchSvc -->|"GET base_price × multipliers"| Redis
+    BookingSvc -->|"Lua: SET NX per night"| Redis
+    BookingSvc -->|"INSERT booking PENDING"| DB
+    BookingSvc -->|"publish"| PayQ
+    PayQ --> Payment
+    Payment -->|"success"| BookingSvc
+    Payment -->|"failure"| CancelSvc
+    BookingSvc -->|"UPDATE availability BOOKED\nDECRBY avail counter"| DB
+    CancelSvc -->|"DEL locks\nrestore availability"| Redis
+    PricingSvc -->|"SET multiplier:location\nSET multiplier:tier"| Redis

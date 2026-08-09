@@ -1,0 +1,81 @@
+<svg viewBox="0 0 900 500" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <style>
+      .box { fill: #1f6feb; stroke: #58a6ff; stroke-width: 2; }
+      .text { fill: #e6edf3; font-family: Arial, sans-serif; font-size: 13px; }
+      .title { font-weight: bold; font-size: 14px; }
+      .header { font-weight: bold; font-size: 12px; }
+      .value { font-family: monospace; }
+      .row1 { fill: #161b22; }
+      .row2 { fill: #0d1117; }
+      .cell { stroke: #30363d; stroke-width: 1; }
+      .arrow { stroke: #58a6ff; stroke-width: 2; fill: none; marker-end: url(#arrowhead); }
+      .stat { fill: #58a6ff; }
+    </style>
+    <marker id="arrowhead" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto">
+      <polygon points="0 0, 10 3, 0 6" fill="#58a6ff" />
+    </marker>
+  </defs>
+
+  <!-- Title -->
+  <text x="450" y="25" class="text title" text-anchor="middle" style="font-size: 15px;">False Positive Rate vs Bloom Filter Parameters</text>
+
+  <!-- Formula -->
+  <text x="30" y="55" class="text title">Formula:</text>
+  <rect x="30" y="65" width="840" height="45" class="box" rx="3" />
+  <text x="450" y="87" class="text" text-anchor="middle" style="font-family: monospace; font-size: 14px;">P(false positive) ≈ (1 - e^(-kn/m))^k</text>
+  <text x="450" y="107" class="text" text-anchor="middle" style="font-size: 12px;">where m=bit array size, n=elements added, k=number of hash functions</text>
+
+  <!-- Table Header -->
+  <rect x="30" y="125" width="840" height="30" class="row1" />
+  <text x="45" y="147" class="text header">Elements (n)</text>
+  <text x="195" y="147" class="text header">Bits (m)</text>
+  <text x="355" y="147" class="text header">Hash Func (k)</text>
+  <text x="535" y="147" class="text header">False Pos Rate</text>
+  <text x="745" y="147" class="text header">Tradeoff</text>
+
+  <!-- Row 1 -->
+  <rect x="30" y="155" width="840" height="30" class="row2 cell" />
+  <text x="45" y="177" class="text value">100K</text>
+  <text x="195" y="177" class="text value">1M bits</text>
+  <text x="355" y="177" class="text value">7</text>
+  <text x="535" y="177" class="text stat" style="font-size: 14px;">~1%</text>
+  <text x="745" y="177" class="text">Good balance</text>
+
+  <!-- Row 2 -->
+  <rect x="30" y="185" width="840" height="30" class="row1 cell" />
+  <text x="45" y="207" class="text value">100K</text>
+  <text x="195" y="207" class="text value">2M bits</text>
+  <text x="355" y="207" class="text value">14</text>
+  <text x="535" y="207" class="text stat" style="font-size: 14px;">~0.01%</text>
+  <text x="745" y="207" class="text">2x bits ✓</text>
+
+  <!-- Row 3 -->
+  <rect x="30" y="215" width="840" height="30" class="row2 cell" />
+  <text x="45" y="237" class="text value">1M</text>
+  <text x="195" y="237" class="text value">10M bits</text>
+  <text x="355" y="237" class="text value">7</text>
+  <text x="535" y="237" class="text stat" style="font-size: 14px;">~1%</text>
+  <text x="745" y="237" class="text">Linear scaling</text>
+
+  <!-- Row 4 -->
+  <rect x="30" y="245" width="840" height="30" class="row1 cell" />
+  <text x="45" y="267" class="text value">1M</text>
+  <text x="195" y="267" class="text value">20M bits</text>
+  <text x="355" y="267" class="text value">14</text>
+  <text x="535" y="267" class="text stat" style="font-size: 14px;">~0.0001%</text>
+  <text x="745" y="267" class="text">Ultra low</text>
+
+  <!-- Key Insight -->
+  <rect x="30" y="295" width="840" height="175" class="box" rx="5" />
+  <text x="450" y="320" class="text title" text-anchor="middle" style="font-size: 14px;">Key Insights</text>
+  
+  <text x="50" y="345" class="text title">Optimal k calculation:</text>
+  <text x="70" y="363" class="text" style="font-family: monospace;">k_optimal ≈ 0.7 * (m/n)</text>
+  <text x="70" y="381" class="text">→ Minimizes false positive rate for given array size</text>
+
+  <text x="50" y="408" class="text title">Scaling patterns:</text>
+  <text x="70" y="426" class="text">• Doubling bit array → ~100x reduction in false positives</text>
+  <text x="70" y="443" class="text">• Add more hash functions → diminishing returns after optimal k</text>
+  <text x="70" y="460" class="text">• Memory is cheap → buy bits, don't compromise on false positive rate</text>
+</svg>

@@ -1,0 +1,85 @@
+<svg viewBox="0 0 900 650" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <style>
+      .box { fill: #1f6feb; stroke: #58a6ff; stroke-width: 2; }
+      .text { fill: #e6edf3; font-family: Arial, sans-serif; font-size: 13px; }
+      .title { font-weight: bold; font-size: 14px; }
+      .bit-off { fill: #30363d; stroke: #58a6ff; stroke-width: 1.5; }
+      .bit-on { fill: #3fb950; stroke: #3fb950; stroke-width: 1.5; }
+      .bit-query { fill: #ffa657; stroke: #ffa657; stroke-width: 1.5; }
+      .arrow { stroke: #58a6ff; stroke-width: 2; fill: none; marker-end: url(#arrowhead); }
+      .check { fill: #3fb950; font-weight: bold; }
+      .cross { fill: #ff6b6b; font-weight: bold; }
+      .hash-box { fill: #a371f7; }
+      .result-yes { fill: #3fb950; }
+      .result-no { fill: #ff6b6b; }
+    </style>
+    <marker id="arrowhead" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto">
+      <polygon points="0 0, 10 3, 0 6" fill="#58a6ff" />
+    </marker>
+  </defs>
+
+  <!-- Title -->
+  <text x="450" y="25" class="text title" text-anchor="middle" style="font-size: 15px;">Querying Bloom Filter: Three Scenarios</text>
+
+  <!-- Scenario 1: Element EXISTS -->
+  <text x="30" y="55" class="text title">Scenario 1: Query "apple" (element EXISTS)</text>
+  
+  <rect x="30" y="65" width="280" height="35" class="hash-box" rx="5" />
+  <text x="170" y="90" class="text title" text-anchor="middle">Query: "apple"</text>
+
+  <path d="M 170 100 L 170 120" class="arrow" />
+
+  <text x="30" y="145" class="text">Hash indices: 3, 7, 12</text>
+  <circle cx="55" cy="155" r="8" class="bit-on" />
+  <text x="70" y="160" class="text">bit[3]=1 ✓</text>
+  <circle cx="55" cy="175" r="8" class="bit-on" />
+  <text x="70" y="180" class="text">bit[7]=1 ✓</text>
+  <circle cx="55" cy="195" r="8" class="bit-on" />
+  <text x="70" y="200" class="text">bit[12]=1 ✓</text>
+
+  <rect x="30" y="215" width="280" height="50" class="result-yes" rx="5" />
+  <text x="170" y="237" class="text title" text-anchor="middle" style="fill: #0d1117;">Result: POSSIBLY IN SET</text>
+  <text x="170" y="255" class="text" text-anchor="middle" style="fill: #0d1117;">(All bits are 1 ✓)</text>
+
+  <!-- Scenario 2: Element NOT IN SET -->
+  <text x="340" y="55" class="text title">Scenario 2: Query "grape" (NOT in set)</text>
+  
+  <rect x="340" y="65" width="260" height="35" class="hash-box" rx="5" />
+  <text x="470" y="90" class="text title" text-anchor="middle">Query: "grape"</text>
+
+  <path d="M 470 100 L 470 120" class="arrow" />
+
+  <text x="340" y="145" class="text">Hash indices: 2, 6, 11</text>
+  <circle cx="365" cy="155" r="8" class="bit-on" />
+  <text x="380" y="160" class="text">bit[2]=0 ✗</text>
+  <circle cx="365" cy="175" r="8" class="bit-off" />
+  <text x="380" y="180" class="text" style="color: #ff6b6b;">bit[6]=0 ✗</text>
+  <circle cx="365" cy="195" r="8" class="bit-on" />
+  <text x="380" y="200" class="text">bit[11]=1</text>
+
+  <rect x="340" y="215" width="260" height="50" class="result-no" rx="5" />
+  <text x="470" y="237" class="text title" text-anchor="middle" style="fill: #0d1117;">Result: DEFINITELY NOT IN</text>
+  <text x="470" y="255" class="text" text-anchor="middle" style="fill: #0d1117;">(At least one bit is 0 ✗)</text>
+
+  <!-- Scenario 3: False Positive -->
+  <text x="660" y="55" class="text title">Scenario 3: Query "orange" (FALSE POSITIVE)</text>
+  
+  <rect x="630" y="65" width="270" height="35" class="hash-box" rx="5" />
+  <text x="765" y="90" class="text title" text-anchor="middle">Query: "orange"</text>
+
+  <path d="M 765 100 L 765 120" class="arrow" />
+
+  <text x="630" y="145" class="text">Hash indices: 3, 7, 12</text>
+  <circle cx="655" cy="155" r="8" class="bit-on" />
+  <text x="670" y="160" class="text">bit[3]=1 ✓</text>
+  <circle cx="655" cy="175" r="8" class="bit-on" />
+  <text x="670" y="180" class="text">bit[7]=1 ✓</text>
+  <circle cx="655" cy="195" r="8" class="bit-on" />
+  <text x="670" y="200" class="text">bit[12]=1 ✓</text>
+
+  <rect x="630" y="215" width="270" height="70" class="result-yes" rx="5" />
+  <text x="765" y="237" class="text title" text-anchor="middle" style="fill: #0d1117;">Result: POSSIBLY IN SET</text>
+  <text x="765" y="255" class="text" text-anchor="middle" style="fill: #0d1117;">(All bits are 1, but "orange"</text>
+  <text x="765" y="273" class="text" text-anchor="middle" style="fill: #0d1117;">was NEVER added!)</text>
+</svg>

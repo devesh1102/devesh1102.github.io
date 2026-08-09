@@ -1,0 +1,42 @@
+graph LR
+    Admin["🛠️ Admin"]
+    User["🧑 User"]
+    GW["API Gateway\nAuth + Rate Limiter"]
+    EventSvc["Event Service"]
+    SubSvc["Subscriber Service"]
+    JobQueue["Job Queue\n(Sidekiq / BullMQ)\nRedis-backed"]
+    JobWorker["Fan-out Job Worker\nloops DB in batches\nwrites to Kafka"]
+    NotifPush["Kafka\nnotif.push"]
+    NotifEmail["Kafka\nnotif.email"]
+    NotifSMS["Kafka\nnotif.sms"]
+    RetryQ["Kafka\nnotif.retry"]
+    DLQ["Kafka\nnotif.dlq"]
+    NotifSvc["Notification Service\n(per channel consumers)"]
+    DB[("PostgreSQL\nusers / events\nsubscribers / devices")]
+    Redis["Redis\nsent:notif_id\n(idempotency)"]
+    APNs["APNs / FCM"]
+    Email["SendGrid"]
+    SMS["Twilio"]
+
+    Admin --> GW
+    User --> GW
+    GW --> EventSvc
+    GW --> SubSvc
+    SubSvc --> DB
+    EventSvc -->|"enqueue fan-out job\n{ eventId }"| JobQueue
+    JobQueue --> JobWorker
+    JobWorker -->|"SELECT subscribers\nLIMIT 1000 OFFSET n"| DB
+    JobWorker -->|"write 1 msg per user"| NotifPush
+    JobWorker -->|"write 1 msg per user"| NotifEmail
+    JobWorker -->|"write 1 msg per user"| NotifSMS
+    NotifPush --> NotifSvc
+    NotifEmail --> NotifSvc
+    NotifSMS --> NotifSvc
+    NotifSvc -->|"SET NX idempotency"| Redis
+    NotifSvc -->|"lookup device token"| DB
+    NotifSvc --> APNs
+    NotifSvc --> Email
+    NotifSvc --> SMS
+    NotifSvc -->|"on failure"| RetryQ
+    RetryQ --> NotifSvc
+    NotifSvc -->|"max retries"| DLQ

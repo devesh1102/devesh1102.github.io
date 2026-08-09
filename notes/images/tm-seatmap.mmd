@@ -1,0 +1,16 @@
+graph TD
+    Client["Client\n(Seat Map View)"]
+    EventSvc["Event Service"]
+    Cache["Redis Cache\nseat:event:{id} → map + status"]
+    EventDB[("Event DB\nseats table")]
+    BookingSvc["Booking Service"]
+
+    Client -->|"GET /events/123/seats"| EventSvc
+    EventSvc -->|"GET seat:event:123"| Cache
+    Cache -->|"HIT: return seat statuses"| EventSvc
+    Cache -->|"MISS"| EventDB
+    EventDB -->|"seat rows + status"| EventSvc
+    EventSvc -->|"SET seat:event:123 EX 30"| Cache
+    EventSvc -->|"seat map JSON"| Client
+
+    BookingSvc -->|"seat locked/confirmed\nINVALIDATE cache"| Cache

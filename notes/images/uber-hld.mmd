@@ -1,0 +1,30 @@
+graph LR
+    Rider["🧑 Rider App"]
+    Driver["🚗 Driver App"]
+    LB["Load Balancer"]
+    RideSvc["Ride Service"]
+    MatchSvc["Match Service"]
+    LocationSvc["Location Service"]
+    TripSvc["Trip Service"]
+    NotifSvc["Notification Service"]
+    RideDB[("Ride DB\n(PostgreSQL)")]
+    LocationStore[("Location Store\n(Redis)\ndriver:id → lat,lng,geohash")]
+    TripDB[("Trip DB\n(PostgreSQL)")]
+    Queue["Kafka\nlocation.updated\nride.requested\nride.matched"]
+    Maps["Maps Service\n(ETA + routing)"]
+
+    Rider -->|"POST /ride/request"| LB
+    Driver -->|"PATCH /location every 5s"| LB
+    LB --> RideSvc
+    LB --> LocationSvc
+    LB --> TripSvc
+    RideSvc -->|"find nearby drivers"| MatchSvc
+    MatchSvc -->|"query geohash"| LocationStore
+    MatchSvc -->|"get ETA"| Maps
+    RideSvc --> RideDB
+    LocationSvc -->|"update lat,lng"| LocationStore
+    LocationSvc -->|"publish"| Queue
+    RideSvc -->|"publish ride.requested"| Queue
+    Queue --> NotifSvc
+    Queue --> MatchSvc
+    TripSvc --> TripDB

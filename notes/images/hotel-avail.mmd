@@ -1,0 +1,12 @@
+graph LR
+    HotelOwner["🏨 Hotel Owner\nregisters room availability"]
+    DB[("availability table\nroom_id | date | status | base_price\nr123 | Jun5 | AVAILABLE | 100\nr123 | Jun6 | AVAILABLE | 100\nr123 | Jun7 | AVAILABLE | 100")]
+    Redis["Redis\nlock:room:r123:Jun5 → userId\nlock:room:r123:Jun6 → userId\navail:hotel:h456 → 47"]
+    BookSvc["Booking Service"]
+    Result[("availability table\nr123 | Jun5 | BOOKED\nr123 | Jun6 | BOOKED\nr123 | Jun7 | BOOKED")]
+
+    HotelOwner -->|"INSERT one row per night"| DB
+    BookSvc -->|"Lua SET NX all night locks"| Redis
+    Redis -->|"all locks acquired"| BookSvc
+    BookSvc -->|"UPDATE status BOOKED"| Result
+    BookSvc -->|"DECRBY avail:hotel counter"| Redis

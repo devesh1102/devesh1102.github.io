@@ -1,0 +1,22 @@
+graph TD
+    City["City Grid"]
+    G1["Geohash Cell\ndp3wjz\n~1km²"]
+    G2["Geohash Cell\ndp3wjy\n~1km²"]
+    G3["Geohash Cell\ndp3wjx\n~1km²"]
+    G4["Geohash Cell\ndp3wjw\n~1km²"]
+    D1["Driver A"]
+    D2["Driver B"]
+    D3["Driver C"]
+    Rider["📍 Rider\npickup point"]
+    Query["Redis GEORADIUS\n2km radius → returns\nnearby driver IDs"]
+
+    City --> G1
+    City --> G2
+    City --> G3
+    City --> G4
+    D1 --> G1
+    D2 --> G1
+    D3 --> G2
+    Rider -->|"hashed to"| G1
+    G1 --> Query
+    G2 --> Query

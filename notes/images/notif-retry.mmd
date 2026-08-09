@@ -1,0 +1,14 @@
+graph LR
+    NS["Notification Service"]
+    APNs["APNs / FCM"]
+    RetryQ["Kafka\nnotif.retry\n{notifId, attempt, next_retry_at}"]
+    RetryConsumer["Retry Consumer"]
+    DLQ["Kafka\nnotif.dlq\n(dead letter queue)"]
+    Alert["Alerting\n(PagerDuty)"]
+
+    NS -->|"APNs call fails"| RetryQ
+    RetryQ -->|"consume after delay"| RetryConsumer
+    RetryConsumer -->|"attempt <= 3:\nretry send"| APNs
+    APNs -->|"still failing"| RetryQ
+    RetryConsumer -->|"attempt > 3"| DLQ
+    DLQ --> Alert
