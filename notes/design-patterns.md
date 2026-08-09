@@ -8,14 +8,15 @@ Design patterns are reusable collaboration models. Use them to solve a demonstra
 
 Centralizes object creation when the concrete type depends on input.
 
-```java
-NotificationSender create(Channel channel) {
-    return switch (channel) {
-        case EMAIL -> new EmailSender();
-        case SMS -> new SmsSender();
-        case PUSH -> new PushSender();
-    };
-}
+```python
+def create(channel):
+    match channel:
+        case Channel.EMAIL:
+            return EmailSender()
+        case Channel.SMS:
+            return SmsSender()
+        case Channel.PUSH:
+            return PushSender()
 ```
 
 Use it when creation rules are changing or callers should not know concrete classes.
@@ -24,13 +25,13 @@ Use it when creation rules are changing or callers should not know concrete clas
 
 Constructs objects with many optional fields while keeping validation readable.
 
-```java
-SearchQuery query = SearchQuery.builder()
+```python
+query = (SearchQuery.builder()
     .city("Bengaluru")
-    .checkIn(checkIn)
-    .checkOut(checkOut)
+    .check_in(check_in)
+    .check_out(check_out)
     .guests(2)
-    .build();
+    .build())
 ```
 
 ### Singleton
@@ -43,14 +44,13 @@ Guarantees one process-local instance. Prefer dependency-injection container lif
 
 Converts an external or legacy API into the interface expected by the application.
 
-```java
-final class StripePaymentAdapter implements PaymentGateway {
-    private final StripeClient stripe;
+```python
+class StripePaymentAdapter(PaymentGateway):
+    def __init__(self, stripe):
+        self.stripe = stripe
 
-    public PaymentResult charge(PaymentRequest request) {
-        return map(stripe.createCharge(toStripeRequest(request)));
-    }
-}
+    def charge(self, request):
+        return map(self.stripe.create_charge(to_stripe_request(request)))
 ```
 
 ### Decorator
@@ -67,10 +67,10 @@ Provides a simple entry point over a complex subsystem. A `CheckoutFacade` may c
 
 Encapsulates interchangeable algorithms. Common examples include pricing, allocation, ranking, and dispatch policies.
 
-```java
-interface SpotAllocationStrategy {
-    ParkingSpot findSpot(Vehicle vehicle, List<ParkingSpot> available);
-}
+```python
+class SpotAllocationStrategy:
+    def find_spot(self, vehicle, available):
+        raise NotImplementedError
 ```
 
 ### Observer
