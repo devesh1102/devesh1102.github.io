@@ -77,6 +77,41 @@
       background: var(--bg3); border: 1px solid var(--border);
       padding: 2px 6px; border-radius: 4px; font-size: 13px; color: var(--accent);
     }
+    
+    /* Collapsible code blocks */
+    .md details {
+      margin: 16px 0;
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+    }
+    .md details summary {
+      padding: 12px 16px;
+      cursor: pointer;
+      font-weight: 600;
+      color: var(--accent);
+      user-select: none;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .md details summary::-webkit-details-marker {
+      color: var(--accent);
+    }
+    .md details summary:hover {
+      background: rgba(88, 166, 255, 0.1);
+    }
+    .md details[open] summary {
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 12px;
+      padding-bottom: 8px;
+    }
+    .md details pre {
+      margin: 0;
+      border: none;
+      border-radius: 0;
+    }
+    
     .md pre {
       background: var(--bg2); border: 1px solid var(--border);
       border-radius: var(--radius); padding: 20px;
@@ -164,16 +199,28 @@
         // Configure marked to NOT escape mermaid code blocks
         const renderer = new marked.Renderer();
         const originalCode = renderer.code.bind(renderer);
+        let codeBlockCount = 0;
+        
         renderer.code = function(code, lang) {
           if (lang === 'mermaid') {
             return `<div class="mermaid">${code}</div>`;
           }
-          return originalCode(code, lang);
+          
+          const htmlCode = originalCode(code, lang);
+          codeBlockCount++;
+          
+          // Wrap code block in collapsible <details>
+          const langLabel = lang ? `(${lang})` : 'Code';
+          return `<details class="code-block">
+            <summary>💻 View Code ${langLabel}</summary>
+            ${htmlCode}
+          </details>`;
         };
+        
         const html = marked.parse(md, { renderer });
         document.getElementById('content').innerHTML = html;
 
-        // Apply syntax highlighting
+        // Apply syntax highlighting to code blocks inside details
         document.querySelectorAll('pre code').forEach(block => {
           hljs.highlightElement(block);
         });
