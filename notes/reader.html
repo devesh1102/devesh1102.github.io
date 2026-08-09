@@ -9,8 +9,10 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet"/>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"/>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css"/>
   <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+  <script src="https://mermaid.ink/mermaid@10/dist/mermaid.min.js"></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     :root {
@@ -83,7 +85,21 @@
     .md pre code {
       background: none; border: none; padding: 0;
       font-size: 13px; color: var(--text); line-height: 1.6;
+      display: block;
     }
+    .hljs {
+      background: var(--bg2) !important;
+      color: var(--text) !important;
+    }
+    .hljs-string { color: #85e89d !important; }
+    .hljs-number { color: #79c0ff !important; }
+    .hljs-literal { color: #79c0ff !important; }
+    .hljs-attr { color: #79c0ff !important; }
+    .hljs-keyword { color: #ff7b72 !important; }
+    .hljs-function { color: #d2a8ff !important; }
+    .hljs-title { color: #d2a8ff !important; }
+    .hljs-params { color: var(--text) !important; }
+    .hljs-comment { color: #8b949e !important; }
     .md blockquote {
       border-left: 3px solid var(--accent); padding: 4px 0 4px 16px;
       margin: 16px 0; color: var(--muted); font-style: italic;
@@ -156,6 +172,11 @@
         };
         const html = marked.parse(md, { renderer });
         document.getElementById('content').innerHTML = html;
+
+        // Apply syntax highlighting
+        document.querySelectorAll('pre code').forEach(block => {
+          hljs.highlightElement(block);
+        });
 
         // Initialize Mermaid
         mermaid.initialize({ startOnLoad: false, theme: 'dark', themeVariables: { background: '#161b22', primaryColor: '#1f6feb', primaryTextColor: '#e6edf3', primaryBorderColor: '#30363d', lineColor: '#8b949e', secondaryColor: '#21262d', tertiaryColor: '#0d1117' } });
