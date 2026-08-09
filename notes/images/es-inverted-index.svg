@@ -1,0 +1,62 @@
+<svg viewBox="0 0 900 500" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <style>
+      .box { fill: #1f6feb; stroke: #58a6ff; stroke-width: 2; }
+      .text { fill: #e6edf3; font-family: Arial, sans-serif; font-size: 13px; }
+      .title { font-weight: bold; font-size: 14px; }
+      .arrow { stroke: #58a6ff; stroke-width: 2; fill: none; marker-end: url(#arrowhead); }
+      .result { fill: #3fb950; }
+    </style>
+    <marker id="arrowhead" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto">
+      <polygon points="0 0, 10 3, 0 6" fill="#58a6ff" />
+    </marker>
+  </defs>
+
+  <!-- Title -->
+  <text x="450" y="25" class="text title" text-anchor="middle">Inverted Index Search Flow: "virat kohli"</text>
+
+  <!-- Query -->
+  <rect x="350" y="45" width="200" height="40" class="box" rx="5" />
+  <text x="450" y="72" class="text title" text-anchor="middle">Query: "virat kohli"</text>
+
+  <!-- Arrow 1 -->
+  <path d="M 450 85 L 450 110" class="arrow" />
+
+  <!-- Term Dictionary -->
+  <rect x="300" y="110" width="300" height="60" class="box" rx="5" />
+  <text x="450" y="135" class="text title" text-anchor="middle">Term Dictionary Lookup</text>
+  <text x="450" y="155" class="text" text-anchor="middle">virat → [Doc1, Doc2, Doc3]  |  kohli → [Doc1, Doc2, Doc3]</text>
+
+  <!-- Arrow 2 -->
+  <path d="M 450 170 L 450 195" class="arrow" />
+
+  <!-- Intersect -->
+  <rect x="350" y="195" width="200" height="50" class="box" rx="5" />
+  <text x="450" y="220" class="text title" text-anchor="middle">Intersect Postings</text>
+  <text x="450" y="237" class="text" text-anchor="middle">Candidates: [Doc1, Doc2, Doc3]</text>
+
+  <!-- Arrow 3 -->
+  <path d="M 450 245 L 450 270" class="arrow" />
+
+  <!-- Position Verify -->
+  <rect x="280" y="270" width="340" height="80" class="box" rx="5" />
+  <text x="450" y="295" class="text title" text-anchor="middle">Verify Token Positions</text>
+  <text x="450" y="315" class="text" text-anchor="middle">Doc1: virat(0) kohli(1) → Adjacent ✓</text>
+  <text x="450" y="330" class="text" text-anchor="middle">Doc2: virat(3) kohli(4) → Adjacent ✓</text>
+  <text x="450" y="345" class="text" text-anchor="middle">Doc3: virat(0) kohli(4) → NOT Adjacent ✗</text>
+
+  <!-- Arrow 4 -->
+  <path d="M 450 350 L 450 375" class="arrow" />
+
+  <!-- Score & Rank -->
+  <rect x="350" y="375" width="200" height="50" class="box" rx="5" />
+  <text x="450" y="400" class="text title" text-anchor="middle">BM25 Score & Rank</text>
+  <text x="450" y="417" class="text" text-anchor="middle">Rank by relevance</text>
+
+  <!-- Arrow 5 -->
+  <path d="M 450 425 L 450 450" class="arrow" />
+
+  <!-- Result -->
+  <rect x="330" y="450" width="240" height="35" class="box result" rx="5" />
+  <text x="450" y="472" class="text title" text-anchor="middle">Result: [Doc1, Doc2]</text>
+</svg>

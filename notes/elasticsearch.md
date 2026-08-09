@@ -34,6 +34,8 @@ scored  -> [Doc 1]
 played  -> [Doc 2, Doc 3]
 ```
 
+![Inverted Index Search Flow](./images/es-inverted-index.svg)
+
 Lucene uses a term dictionary and compressed postings lists. A posting can include document ID, term frequency and token positions. Searching is fast because you look up terms in the dictionary, get the postings list, intersect them, and rank results — no full document scans.
 
 ## 3. Mappings and analysis
@@ -65,21 +67,14 @@ Doc 4: "Kohli is a famous cricketer"
 
 **Search query: "virat kohli" (exact phrase)**
 
-| Document | virat position | kohli position | Phrase match? |
-|---|---|---|---|
-| 1 | 0 | 1 | Yes |
-| 2 | 3 | 4 | Yes |
-| 3 | 0 | 4 | No |
-| 4 | Absent | 0 | No |
+![Phrase Matching Example](./images/es-phrase-matching.svg)
 
-**How the search works:**
-```
-virat documents: [1, 2, 3]
-kohli documents: [1, 2, 3, 4]
-intersection: [1, 2, 3]
-position verification: [1, 2]  (positions are adjacent)
-matching document count: 2
-```
+| Document | virat position | kohli position | Adjacent? | Phrase match? |
+|---|---|---|---|---|
+| 1 | 0 | 1 | Yes | ✓ YES |
+| 2 | 3 | 4 | Yes | ✓ YES |
+| 3 | 0 | 4 | No | ✗ NO |
+| 4 | — | 0 | N/A | ✗ NO |
 
 Phrase matching requires position checks. Simply intersecting postings lists gives candidates; then positions are verified. This counts matching documents. Counting every phrase occurrence requires additional position/term-vector processing or a count stored during ingestion.
 
@@ -94,15 +89,17 @@ Phrase matching requires position checks. Simply intersecting postings lists giv
 | `doc_values` | Sorting and aggregations |
 | Metadata | Index, ID, version and sequence information |
 
-**Search flow:**
-```
-query term
-  -> term dictionary
-  -> postings list
-  -> candidate IDs
-  -> frequency/position checks
-  -> retrieve JSON from _source
-```
+**Complete search flow:**
+
+| Step | Operation | Input | Output |
+|---|---|---|---|
+| 1 | Query Input | User enters text | "virat kohli" |
+| 2 | Term Dictionary Lookup | Query terms | Term dictionary entries |
+| 3 | Get Postings Lists | Terms from dictionary | List of document IDs |
+| 4 | Intersect Postings | Multiple postings lists | Candidate documents |
+| 5 | Position Verification | Candidate docs + positions | Matched documents (phrase check) |
+| 6 | BM25 Scoring | Matched docs | Relevance scores |
+| 7 | Retrieve & Return | Top N scored docs | Ranked results with _source JSON |
 
 Positions are details associated with postings; they are not a replacement for the inverted index.
 

@@ -1,0 +1,99 @@
+<svg viewBox="0 0 950 600" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <style>
+      .box { fill: #1f6feb; stroke: #58a6ff; stroke-width: 2; }
+      .text { fill: #e6edf3; font-family: Arial, sans-serif; font-size: 12px; }
+      .title { font-weight: bold; font-size: 13px; }
+      .match { fill: #3fb950; }
+      .nomatch { fill: #f85149; }
+      .arrow { stroke: #58a6ff; stroke-width: 2; fill: none; marker-end: url(#arrowhead); }
+      .divider { stroke: #30363d; stroke-width: 1; stroke-dasharray: 5,5; }
+    </style>
+    <marker id="arrowhead" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto">
+      <polygon points="0 0, 10 3, 0 6" fill="#58a6ff" />
+    </marker>
+  </defs>
+
+  <!-- Title -->
+  <text x="475" y="25" class="text title" text-anchor="middle" style="font-size: 15px;">Phrase Matching: "virat kohli"</text>
+
+  <!-- Doc Headers -->
+  <text x="20" y="50" class="text title">Documents After Analysis:</text>
+
+  <!-- Doc1 -->
+  <rect x="10" y="60" width="220" height="35" class="box" rx="3" />
+  <text x="120" y="82" class="text" text-anchor="middle">Doc1: virat(0) kohli(1) scored(2)...</text>
+
+  <!-- Doc2 -->
+  <rect x="250" y="60" width="220" height="35" class="box" rx="3" />
+  <text x="360" y="82" class="text" text-anchor="middle">Doc2: ...virat(3) kohli(4) played...</text>
+
+  <!-- Doc3 -->
+  <rect x="490" y="60" width="220" height="35" class="box" rx="3" />
+  <text x="600" y="82" class="text" text-anchor="middle">Doc3: virat(0)...kohli(4)...</text>
+
+  <!-- Doc4 -->
+  <rect x="730" y="60" width="210" height="35" class="box" rx="3" />
+  <text x="835" y="82" class="text" text-anchor="middle">Doc4: kohli(0)...is...cricketer</text>
+
+  <!-- Divider -->
+  <line x1="10" y1="105" x2="940" y2="105" class="divider" />
+
+  <!-- Step 1: Get virat docs -->
+  <text x="20" y="130" class="text title">Step 1: Find "virat"</text>
+  <rect x="10" y="140" width="920" height="30" class="box" rx="3" />
+  <text x="475" y="162" class="text" text-anchor="middle">Postings: [Doc1, Doc2, Doc3]</text>
+
+  <!-- Step 2: Get kohli docs -->
+  <text x="20" y="185" class="text title">Step 2: Find "kohli"</text>
+  <rect x="10" y="195" width="920" height="30" class="box" rx="3" />
+  <text x="475" y="217" class="text" text-anchor="middle">Postings: [Doc1, Doc2, Doc3, Doc4]</text>
+
+  <!-- Step 3: Intersect -->
+  <text x="20" y="260" class="text title">Step 3: Intersect</text>
+  <rect x="10" y="270" width="920" height="30" class="box" rx="3" />
+  <text x="475" y="292" class="text" text-anchor="middle">Candidates: [Doc1, Doc2, Doc3]</text>
+
+  <!-- Divider 2 -->
+  <line x1="10" y1="310" x2="940" y2="310" class="divider" />
+
+  <!-- Step 4: Position Check -->
+  <text x="20" y="335" class="text title">Step 4: Verify Positions (kohli_pos - virat_pos = 1?)</text>
+
+  <!-- Doc1 Match -->
+  <rect x="20" y="350" width="210" height="90" class="box" rx="3" />
+  <text x="125" y="368" class="text title" text-anchor="middle">Doc1</text>
+  <text x="125" y="385" class="text" text-anchor="middle">virat(0) kohli(1)</text>
+  <text x="125" y="400" class="text" text-anchor="middle">1 - 0 = 1 ✓</text>
+  <rect x="30" y="408" width="190" height="25" class="match" rx="2" />
+  <text x="125" y="425" class="text" text-anchor="middle" style="fill: white; font-weight: bold;">MATCH</text>
+
+  <!-- Doc2 Match -->
+  <rect x="255" y="350" width="210" height="90" class="box" rx="3" />
+  <text x="360" y="368" class="text title" text-anchor="middle">Doc2</text>
+  <text x="360" y="385" class="text" text-anchor="middle">virat(3) kohli(4)</text>
+  <text x="360" y="400" class="text" text-anchor="middle">4 - 3 = 1 ✓</text>
+  <rect x="265" y="408" width="190" height="25" class="match" rx="2" />
+  <text x="360" y="425" class="text" text-anchor="middle" style="fill: white; font-weight: bold;">MATCH</text>
+
+  <!-- Doc3 No Match -->
+  <rect x="490" y="350" width="210" height="90" class="box" rx="3" />
+  <text x="595" y="368" class="text title" text-anchor="middle">Doc3</text>
+  <text x="595" y="385" class="text" text-anchor="middle">virat(0) kohli(4)</text>
+  <text x="595" y="400" class="text" text-anchor="middle">4 - 0 = 4 ✗</text>
+  <rect x="500" y="408" width="190" height="25" class="nomatch" rx="2" />
+  <text x="595" y="425" class="text" text-anchor="middle" style="fill: white; font-weight: bold;">NO MATCH</text>
+
+  <!-- Doc4 No Match -->
+  <rect x="725" y="350" width="210" height="90" class="box" rx="3" />
+  <text x="830" y="368" class="text title" text-anchor="middle">Doc4</text>
+  <text x="830" y="385" class="text" text-anchor="middle">no "virat"</text>
+  <text x="830" y="400" class="text" text-anchor="middle">—</text>
+  <rect x="735" y="408" width="190" height="25" class="nomatch" rx="2" />
+  <text x="830" y="425" class="text" text-anchor="middle" style="fill: white; font-weight: bold;">NO MATCH</text>
+
+  <!-- Result -->
+  <rect x="10" y="465" width="920" height="45" class="match" rx="3" />
+  <text x="475" y="485" class="text title" text-anchor="middle" style="fill: white; font-size: 14px;">Result: 2 documents match phrase "virat kohli"</text>
+  <text x="475" y="502" class="text" text-anchor="middle" style="fill: white;">Doc1 ✓  |  Doc2 ✓</text>
+</svg>
