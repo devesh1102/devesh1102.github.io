@@ -23,41 +23,71 @@ ElevatorSystem
   └── DispatchStrategy
 ```
 
-```java
-enum Direction { UP, DOWN, IDLE }
-enum ElevatorState { IDLE, MOVING, STOPPED, MAINTENANCE, EMERGENCY }
-enum DoorState { OPEN, CLOSED, OPENING, CLOSING, BLOCKED }
+```python
+from enum import Enum
 
-record HallRequest(int floor, Direction direction) {}
-record CarRequest(int destinationFloor) {}
+class Direction(Enum):
+    UP = 1
+    DOWN = 2
+    IDLE = 3
+
+class ElevatorState(Enum):
+    IDLE = 1
+    MOVING = 2
+    STOPPED = 3
+    MAINTENANCE = 4
+    EMERGENCY = 5
+
+class DoorState(Enum):
+    OPEN = 1
+    CLOSED = 2
+    OPENING = 3
+    CLOSING = 4
+    BLOCKED = 5
+
+class HallRequest:
+    def __init__(self, floor, direction):
+        self.floor = floor
+        self.direction = direction
+
+class CarRequest:
+    def __init__(self, destination_floor):
+        self.destination_floor = destination_floor
 ```
 
 ## Elevator Car
 
-```java
-final class ElevatorCar {
-    private final String id;
-    private int currentFloor;
-    private Direction direction = Direction.IDLE;
-    private ElevatorState state = ElevatorState.IDLE;
-    private final Door door;
-    private final NavigableSet<Integer> upStops = new TreeSet<>();
-    private final NavigableSet<Integer> downStops =
-        new TreeSet<>(Comparator.reverseOrder());
+```python
+from sortedcontainers import SortedSet
 
-    void addStop(int floor) { /* add to the direction-aware queue */ }
-    void step() { /* perform one safe state transition */ }
-}
+class ElevatorCar:
+    def __init__(self, car_id):
+        self.id = car_id
+        self.current_floor = 0
+        self.direction = Direction.IDLE
+        self.state = ElevatorState.IDLE
+        self.door = Door()
+        self.up_stops = SortedSet()
+        self.down_stops = SortedSet(reverse=True)
+
+    def add_stop(self, floor):
+        """Add floor to the direction-aware queue"""
+        pass
+
+    def step(self):
+        """Perform one safe state transition"""
+        pass
 ```
 
 The elevator owns its movement state and stop queues. Callers submit requests but cannot directly change its floor, direction, or door state.
 
 ## Dispatch Strategy
 
-```java
-interface DispatchStrategy {
-    ElevatorCar select(HallRequest request, List<ElevatorCar> elevators);
-}
+```python
+class DispatchStrategy:
+    def select(self, request, elevators):
+        """Select an elevator for the hall request"""
+        raise NotImplementedError
 ```
 
 A simple cost function can prefer:
