@@ -375,8 +375,50 @@ for brake in brakes:
 ### Benefits
 - **Flexibility**: Can add new brake types without changing existing code
 - **Extensibility**: Easy to extend with DiscBrake, RimBrake, etc.
+- **Eliminates type checking**: No need for `if/else` statements checking brake type (bike just calls `brake()`)
 - **Simplicity**: Bike code doesn't care which brake type it uses
 - **Loose coupling**: Brake implementations are independent
+
+### Why "Eliminates Type Checking" Matters
+
+**WITHOUT Polymorphism (Bad - lots of type checking):**
+
+```python
+# Must check EVERY brake type
+def apply_brake(brake, force):
+    if isinstance(brake, DiscBrake):
+        brake.brake_hydraulic(force)
+    elif isinstance(brake, RimBrake):
+        brake.brake_rim(force)
+    elif isinstance(brake, CoasterBrake):
+        brake.brake_coaster(force)
+    else:
+        print("Unknown brake type!")
+
+# Problem: Add new brake type? Must update this function!
+```
+
+**WITH Polymorphism (Good - no type checking):**
+
+```python
+# Just call brake() - polymorphism handles the rest
+def apply_brake(brake, force):
+    brake.brake(force)  # Works with ANY brake type
+
+# Add new brake? No changes needed!
+class ElectricBrake(Brake):
+    def brake(self, force):
+        print("⚡ Electric brake engaged")
+
+# apply_brake() still works perfectly!
+```
+
+**Why This Matters:**
+- No `if/else` chains = cleaner code
+- Add new brake types = zero code changes
+- Extensible without modification = SOLID Open/Closed Principle ✓
+
+---
 
 ### Costs & Trade-offs: The Indirection Problem
 
