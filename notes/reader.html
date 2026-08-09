@@ -148,6 +148,20 @@
     .md .mermaid { background: var(--bg2); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; margin: 16px 0; text-align: center; }
     .md .mermaid svg { max-width: 100%; height: auto; }
 
+    .md details.code-block { margin: 16px 0; }
+    .md details.code-block > summary {
+      cursor: pointer; list-style: none; user-select: none;
+      display: inline-flex; align-items: center; gap: 8px;
+      background: var(--bg2); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 8px 14px;
+      color: var(--muted); font-size: 13px; font-weight: 500;
+    }
+    .md details.code-block > summary::-webkit-details-marker { display: none; }
+    .md details.code-block > summary::before { content: '\25B8'; transition: transform .15s ease; }
+    .md details.code-block[open] > summary::before { transform: rotate(90deg); }
+    .md details.code-block > summary:hover { color: var(--text); border-color: var(--accent); }
+    .md details.code-block > pre { margin-top: 8px; }
+
     .loading { color: var(--muted); font-size: 14px; padding: 40px 0; }
     .error { color: #f85149; font-size: 14px; padding: 40px 0; }
 
@@ -196,33 +210,40 @@
         return r.text();
       })
       .then(md => {
-        // Configure marked to NOT escape mermaid code blocks
-        const renderer = new marked.Renderer();
-        const originalCode = renderer.code.bind(renderer);
-        let codeBlockCount = 0;
-        
-        renderer.code = function(code, lang) {
-          if (lang === 'mermaid') {
-            return `<div class="mermaid">${code}</div>`;
+        // Pull mermaid fences out BEFORE marked sees them. This avoids depending
+        // on marked's renderer API, which changed signature across major versions.
+        const mermaidBlocks = [];
+        const prepped = md.replace(
+          /^```mermaid[ \t]*\r?\n([\s\S]*?)^```[ \t]*$/gm,
+          (_match, code) => {
+            mermaidBlocks.push(code);
+            return `\n<div class="mermaid-slot" data-idx="${mermaidBlocks.length - 1}"></div>\n`;
           }
-          
-          const htmlCode = originalCode(code, lang);
-          codeBlockCount++;
-          
-          // Wrap code block in collapsible <details>
-          const langLabel = lang ? `(${lang})` : 'Code';
-          return `<details class="code-block">
-            <summary>💻 View Code ${langLabel}</summary>
-            ${htmlCode}
-          </details>`;
-        };
-        
-        const html = marked.parse(md, { renderer });
-        document.getElementById('content').innerHTML = html;
+        );
 
-        // Apply syntax highlighting to code blocks inside details
-        document.querySelectorAll('pre code').forEach(block => {
+        document.getElementById('content').innerHTML = marked.parse(prepped);
+
+        // Swap placeholders for real mermaid nodes (textContent avoids escaping issues)
+        document.querySelectorAll('.mermaid-slot').forEach(slot => {
+          const div = document.createElement('div');
+          div.className = 'mermaid';
+          div.textContent = mermaidBlocks[Number(slot.dataset.idx)];
+          slot.replaceWith(div);
+        });
+
+        // Highlight code, then wrap each block in a collapsible <details>
+        document.querySelectorAll('.md pre > code').forEach(block => {
           hljs.highlightElement(block);
+          const pre = block.parentElement;
+          if (pre.closest('details.code-block')) return;
+          const lang = (block.className.match(/language-([\w-]+)/) || [])[1];
+          const details = document.createElement('details');
+          details.className = 'code-block';
+          const summary = document.createElement('summary');
+          summary.textContent = lang ? `View code (${lang})` : 'View code';
+          details.appendChild(summary);
+          pre.replaceWith(details);
+          details.appendChild(pre);
         });
 
         // Initialize Mermaid

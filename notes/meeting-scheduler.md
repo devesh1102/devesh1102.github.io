@@ -1,574 +1,386 @@
 # Meeting Scheduler — System Design (Google Calendar / Outlook)
 
 ## TL;DR
-* **Core challenge**: A weekly meeting running for 2 years is **one row**, not 104 rows. Never materialise every occurrence.
-* **Recurrence model**: Store an **RRULE** (RFC 5545) on the series + an **exceptions table** for occurrences that differ.
-* **Per-occurrence edits**: "Remove Bob from *this* Tuesday only" creates an **exception row** keyed by `(series_id, occurrence_date)` — the series itself is untouched.
-* **RSVP**: Attendee status lives on `series_attendees` (default for all occurrences) and is **overridden** by `occurrence_attendees` for a single date.
-* **Reads**: Expanding a recurrence for a date range is CPU work, not I/O — cache the expanded month view per user in Redis.
-* **Conflicts**: Free/busy check = expand all series overlapping the window, then interval-overlap test.
+* **One idea:** store the repeat **pattern**, not the occurrences. A weekly meeting running forever is **one row**.
+* **No RRULE library needed** — four plain columns (`repeat_type`, `repeat_every`, `repeat_days`, `repeat_until`) cover daily / weekly / monthly / forever.
+* **Three tables:** `meetings`, `attendees`, `exceptions`.
+* **The trick:** `attendees.occurrence_date` is **nullable**. Empty = applies to every occurrence. A date = override for that one date. That's how you add/remove someone from a single occurrence.
+* **The rule to memorise:** *no row = inherit from the series.* Removing someone must be an **explicit** `REMOVED` row, never a delete.
+* **Reminders** can't be pre-created for infinite meetings — a **rolling 24-hour materializer** turns the pattern into concrete reminder rows, and a dispatcher sends them.
 
 ---
 
-## Interview Reality Check — What You Actually Draw in 45 Minutes
+## Step 1: Requirements
 
-> **Honest answer: you cannot produce this whole page in an interview.** This document is the *study reference*. Below is the *interview script* — what fits, in what order, and what you only mention if asked.
+| | Requirement |
+|---|---|
+| ✅ | Create a meeting with title, time, duration, attendees |
+| ✅ | Meeting can **repeat** — daily, weekly, monthly, or **forever** |
+| ✅ | Add or remove an attendee from **one occurrence** without touching the series |
+| ✅ | Attendees **accept / reject** — for the series, or for one occurrence |
+| ✅ | Load a user's calendar for a date range |
+| ✅ | **Notify everyone** — invites, updates, and a reminder before each occurrence |
 
-### The 45-minute budget
+**The NFR that shapes everything:** reads outnumber writes ~100:1. People stare at calendars; they rarely edit them.
 
-| Time | Phase | What you produce |
+---
+
+## Step 2: The Only Decision That Matters
+
+> **"A weekly meeting with no end date has infinite occurrences. I am not going to store them."**
+
+| | Store every occurrence | Store the pattern ✅ |
 |---|---|---|
-| 0–5 min | Requirements | 4 bullet FRs, 2 NFRs. **Say the read:write ratio out loud.** |
-| 5–8 min | The key insight | "I will not store one row per occurrence." Draw nothing yet — just say it. |
-| 8–18 min | Data model | 4 boxes on the board (below). This is where you win. |
-| 18–28 min | Architecture | 6 boxes, one arrow each (below). Keep it boring. |
-| 28–40 min | Deep dive | Interviewer picks. Usually "remove a user from one occurrence". |
-| 40–45 min | Scale + trade-offs | Cache, shard key, one thing you'd do differently. |
+| Weekly meeting, no end date | **Infinite rows** | 1 row |
+| Change time for all future | UPDATE thousands of rows | Update 1 field |
+| Create the meeting | 100+ INSERTs | 1 INSERT |
+| Load a month | Simple SELECT | SELECT + expand in memory |
 
-### Diagram 1 — the only data model you draw (≈3 minutes)
+Storing the pattern costs a little CPU on read and saves unbounded storage on write. With a 100:1 read ratio that sounds backwards — until you notice expansion is **bounded by the screen**: a month view expands ~4 dates per meeting. Microseconds.
+
+**Say this:** *"Infinity lives in the pattern. Expansion is capped by the window the user is looking at."*
+
+---
+
+## Step 3: The Data Model — 3 Tables
 
 ```mermaid
 flowchart LR
-    S["<b>event_series</b><br/>series_id<br/>title, start_utc<br/><b>rrule</b>, timezone"]
-    SA["<b>series_attendee</b><br/>series_id, user_id<br/>rsvp_status<br/><i>= the default</i>"]
-    OE["<b>occurrence_exception</b><br/>series_id, <b>date</b><br/>CANCELLED / MODIFIED"]
-    OA["<b>occurrence_attendee</b><br/>series_id, <b>date</b>, user_id<br/>ADDED / REMOVED<br/><i>= the override</i>"]
+    M["<b>meetings</b><br/>meeting_id · title<br/>start_utc · duration<br/><b>repeat_type · repeat_every</b><br/><b>repeat_days · repeat_until</b>"]
+    A["<b>attendees</b><br/>meeting_id · user_id<br/><b>occurrence_date (nullable)</b><br/>membership · rsvp_status"]
+    E["<b>exceptions</b><br/>meeting_id<br/><b>occurrence_date</b><br/>CANCELLED / moved time"]
 
-    S -->|"1..N"| SA
-    S -->|"0..N"| OE
-    S -->|"0..N"| OA
+    M -->|"who is invited"| A
+    M -->|"which dates differ"| E
 
-    style S fill:#1f6feb,color:#fff
-    style SA fill:#3fb950,color:#fff
-    style OE fill:#f0883e,color:#fff
-    style OA fill:#f85149,color:#fff
+    style M fill:#1f6feb,color:#fff
+    style A fill:#3fb950,color:#fff
+    style E fill:#f0883e,color:#fff
 ```
-
-**Narrate while drawing:** "Series holds the rule. Series-attendee is the default roster. The two orange/red tables only get rows when a *single date* deviates — that's how I add or remove someone from one occurrence without touching the series."
-
-That sentence alone answers three of the four functional requirements.
-
-### Diagram 2 — the only architecture you draw (≈3 minutes)
-
-```mermaid
-flowchart LR
-    C([Client]) --> GW[API Gateway]
-    GW --> W[Event / RSVP<br/>write path]
-    GW --> R[Calendar Service<br/>read path]
-    W --> DB[(PostgreSQL)]
-    R --> DB
-    R <--> CA[(Redis<br/>expanded view)]
-    W --> K[[Kafka]]
-    K --> N[Notify + invalidate cache]
-    N --> CA
-
-    style C fill:#1f6feb,color:#fff
-    style DB fill:#3fb950,color:#fff
-    style CA fill:#f85149,color:#fff
-    style K fill:#f0883e,color:#fff
-```
-
-Six boxes. **Split write path from read path** — that split is the point, because reads outnumber writes 100:1 and reads do the expensive expansion work.
-
-### What to say vs. what to skip
-
-| ✅ Say it unprompted (these are the scoring lines) | ⏸️ Only if asked / if time allows |
-|---|---|
-| "I store the rule, not the occurrences." | Full RRULE syntax table |
-| "Series is the default, occurrence is the override." | The 5-step expansion pseudocode |
-| "Absence of a row means *inherit from series*, so removal must be an **explicit** `REMOVED` row." | ER diagram with every column typed |
-| "'This and following' splits the series with `UNTIL`." | Find-a-time interval sweep |
-| "Expansion happens in the series' local timezone, not UTC — otherwise DST breaks it." | Reminder scheduler, sharding scheme |
-| "Reads are cached per user-per-month and invalidated off Kafka." | Optimistic locking / version column |
-
-### The three questions you will actually be asked
-
-1. **"Remove Bob from just next Tuesday — what writes happen?"**
-   → One `occurrence_attendee` row: `(series_id, 2026-08-12, bob, REMOVED)`. Series untouched. Every other Tuesday still has Bob.
-
-2. **"The organiser moves the whole series to 11:00, but one occurrence was already moved to 15:00. What happens?"**
-   → It stays at 15:00. An explicit per-date override outranks a series-level change. Say this is a *product* decision you'd confirm, not just a technical one.
-
-3. **"How do you load a month view fast?"**
-   → Fetch series overlapping the window → expand each rule in-memory → apply exceptions → apply roster deltas → cache the result. It's CPU, not I/O, and it's bounded by the window.
-
-### If the interviewer says "keep it simple"
-Drop Kafka, drop Redis, drop the Availability Service. The design still stands on **`event_series` + `occurrence_exception` + `occurrence_attendee`**. Those three tables *are* the answer; everything else is scaling garnish you add when asked "now make it work for 100M users."
-
----
-
-
-### Functional Requirements
-| Priority | Requirement |
-|---|---|
-| ✅ Core | User creates a meeting with a title, time, duration, and attendees |
-| ✅ Core | Meeting can **recur** — daily / weekly / every 2nd Tuesday / until a date |
-| ✅ Core | User can **add or remove an attendee from a single occurrence** without touching the series |
-| ✅ Core | Attendees can **accept / reject / tentatively accept** — per series or per occurrence |
-| ✅ Core | User sees their calendar for a date range (day / week / month) |
-| 🔲 Secondary | Free/busy conflict detection and "find a time" suggestions |
-| 🔲 Out of scope | Video-conference link provisioning, room/resource booking |
-
-### Non-Functional Requirements
-| Requirement | Target |
-|---|---|
-| Read:write ratio | ~100:1 — calendars are viewed far more than edited |
-| Calendar load latency | < 200 ms for a month view |
-| Consistency | Read-your-writes for the organiser; eventual for other attendees' RSVP badges |
-| Correctness | An occurrence must **never** silently lose an attendee edit |
-| Scale | 100M users, avg 20 meetings/week each |
-
----
-
-## Step 2: The Central Modelling Decision
-
-> **Interview signal:** the first thing to say out loud is *"I will not store one row per occurrence."*
-
-### ❌ Option A — Materialise every occurrence
-Create a row for every Tuesday for the next 2 years.
-
-| Problem | Why it hurts |
-|---|---|
-| Storage | A weekly meeting with no end date is **infinite** rows |
-| Edits | "Change the time for all future" = UPDATE across thousands of rows |
-| Writes | Creating one recurring meeting = 100+ inserts |
-
-### ✅ Option B — Store the rule, expand on read
-One `event_series` row holding an **RRULE**, plus small exception rows.
-
-| Benefit | Why |
-|---|---|
-| Storage | O(1) per series, O(edits) for exceptions |
-| Edits | "All future" = update one rule (or split the series) |
-| Reads | Expansion is pure CPU over a bounded window (a month) — microseconds |
-
-**Say this:** "I store the recurrence rule, not the occurrences. Occurrences are *derived* on read for the requested window, and only the ones that deviate get persisted as exceptions."
-
----
-
-## Step 3: High-Level Architecture
-
-```mermaid
-flowchart TD
-    U([Web / Mobile Client]) -->|REST + WebSocket| AG[API Gateway<br/>auth, rate limit]
-
-    AG --> ES[Event Service<br/>create/update series]
-    AG --> CS[Calendar Service<br/>expand + read views]
-    AG --> RS[RSVP Service<br/>accept / reject]
-    AG --> FB[Availability Service<br/>free-busy / find-a-time]
-
-    ES --> DB[(PostgreSQL<br/>series, exceptions,<br/>attendees)]
-    CS --> DB
-    RS --> DB
-    FB --> DB
-
-    CS --> RC[("Redis<br/>expanded month view<br/>cache: cal:user:month")]
-    FB --> RC
-
-    ES -->|event.created / updated| K[[Kafka<br/>calendar-events]]
-    RS -->|rsvp.changed| K
-
-    K --> NS[Notification Service<br/>email / push invites]
-    K --> IV[Cache Invalidator<br/>drops affected cal:user:* keys]
-    K --> RM[Reminder Scheduler<br/>T-10min pings]
-
-    IV --> RC
-
-    style U fill:#1f6feb,color:#fff
-    style DB fill:#3fb950,color:#fff
-    style RC fill:#f85149,color:#fff
-    style K fill:#f0883e,color:#fff
-```
-
-### What each component does
-
-**Event Service** — owns series creation and mutation. Decides whether an edit applies to *this occurrence*, *this and following*, or *the whole series*, and writes the right rows.
-
-**Calendar Service** — the read path. Takes `(userId, from, to)`, loads every series the user is on that could overlap the window, expands the RRULE, applies exceptions, and returns a flat list of occurrences.
-
-**RSVP Service** — writes accept/reject at series or occurrence granularity. Kept separate from Event Service because RSVP is a **high-frequency, low-privilege** write that must not contend with organiser edits.
-
-**Availability Service** — reuses the expansion logic to answer "is this person free at 3pm?" and to suggest slots.
-
-**Kafka** — decouples notification, cache invalidation, and reminders from the write path so creating a meeting stays fast.
-
-**Redis** — caches the *expanded* month view per user (`cal:user:{id}:2026-08`). Expansion is cheap, but doing it for 100M users on every scroll is not.
-
----
-
-## Step 4: Data Model
-
-```mermaid
-erDiagram
-    EVENT_SERIES ||--o{ SERIES_ATTENDEE : "default roster"
-    EVENT_SERIES ||--o{ OCCURRENCE_EXCEPTION : "deviations"
-    OCCURRENCE_EXCEPTION ||--o{ OCCURRENCE_ATTENDEE : "per-date roster delta"
-    USERS ||--o{ SERIES_ATTENDEE : "invited to"
-    USERS ||--o{ OCCURRENCE_ATTENDEE : "overrides"
-
-    EVENT_SERIES {
-        uuid series_id PK
-        uuid organizer_id
-        text title
-        timestamptz start_utc
-        int duration_min
-        text timezone
-        text rrule
-        timestamptz recurrence_end
-    }
-    OCCURRENCE_EXCEPTION {
-        uuid series_id FK
-        date occurrence_date PK
-        text status
-        timestamptz override_start_utc
-        int override_duration_min
-    }
-    SERIES_ATTENDEE {
-        uuid series_id FK
-        uuid user_id FK
-        text role
-        text rsvp_status
-    }
-    OCCURRENCE_ATTENDEE {
-        uuid series_id FK
-        date occurrence_date
-        uuid user_id FK
-        text membership
-        text rsvp_status
-    }
-```
-
-### Tables
 
 ```sql
--- The rule. ONE row for "every Tuesday 10:00 forever".
-event_series (
-  series_id       UUID PRIMARY KEY,
-  organizer_id    UUID NOT NULL,
-  title           TEXT NOT NULL,
-  description     TEXT,
-  start_utc       TIMESTAMPTZ NOT NULL,   -- first occurrence
-  duration_min    INT NOT NULL,
-  timezone        TEXT NOT NULL,          -- 'Asia/Kolkata' — needed for DST
-  rrule           TEXT,                   -- NULL = single, non-recurring meeting
-  recurrence_end  TIMESTAMPTZ,            -- NULL = never ends
-  created_at      TIMESTAMPTZ DEFAULT now(),
-  version         INT DEFAULT 1           -- optimistic locking
+meetings (
+  meeting_id   UUID PRIMARY KEY,
+  organizer_id UUID,
+  title        TEXT,
+  start_utc    TIMESTAMPTZ,   -- the FIRST occurrence
+  duration_min INT,
+  timezone     TEXT,          -- 'Asia/Kolkata' — needed for DST
+
+  -- recurrence, in plain columns. no library, no parsing.
+  repeat_type  TEXT,          -- NONE | DAILY | WEEKLY | MONTHLY
+  repeat_every INT  DEFAULT 1,-- 2 = every 2nd week
+  repeat_days  TEXT,          -- WEEKLY only: 'MO,WE,FR'
+  repeat_until TIMESTAMPTZ    -- NULL = forever
 )
 
--- Only rows for occurrences that DEVIATE from the rule.
-occurrence_exception (
-  series_id            UUID REFERENCES event_series(series_id),
-  occurrence_date      DATE NOT NULL,     -- the ORIGINAL date the rule produced
-  status               TEXT CHECK (status IN ('MODIFIED','CANCELLED')),
-  override_start_utc   TIMESTAMPTZ,       -- NULL = time unchanged
-  override_duration_min INT,
-  override_title       TEXT,
-  PRIMARY KEY (series_id, occurrence_date)
-)
-
--- Default roster: applies to EVERY occurrence unless overridden.
-series_attendee (
-  series_id   UUID REFERENCES event_series(series_id),
-  user_id     UUID NOT NULL,
-  role        TEXT CHECK (role IN ('ORGANIZER','REQUIRED','OPTIONAL')),
-  rsvp_status TEXT CHECK (rsvp_status IN ('PENDING','ACCEPTED','DECLINED','TENTATIVE'))
-              DEFAULT 'PENDING',
-  PRIMARY KEY (series_id, user_id)
-)
-
--- Roster DELTA for one specific date. This is the "add/remove user
--- from one occurrence" feature and the per-occurrence RSVP.
-occurrence_attendee (
-  series_id       UUID,
-  occurrence_date DATE,
+attendees (
+  meeting_id      UUID,
   user_id         UUID,
-  membership      TEXT CHECK (membership IN ('ADDED','REMOVED')),
-  rsvp_status     TEXT CHECK (rsvp_status IN ('PENDING','ACCEPTED','DECLINED','TENTATIVE')),
-  PRIMARY KEY (series_id, occurrence_date, user_id)
+  occurrence_date DATE,       -- NULL = every occurrence | date = just that one
+  membership      TEXT,       -- ADDED | REMOVED
+  rsvp_status     TEXT        -- PENDING | ACCEPTED | DECLINED
 )
 
--- Read-path index: find every series a user belongs to, fast.
-CREATE INDEX idx_series_attendee_user ON series_attendee(user_id);
-CREATE INDEX idx_series_window ON event_series(start_utc, recurrence_end);
+exceptions (
+  meeting_id      UUID,
+  occurrence_date DATE,       -- the date the pattern produced
+  status          TEXT,       -- CANCELLED | MOVED
+  new_start_utc   TIMESTAMPTZ,
+  PRIMARY KEY (meeting_id, occurrence_date)
+)
 ```
 
-> **Why `occurrence_date` and not `occurrence_id`?** The date produced by the rule is the *natural, stable key*. If the occurrence is later moved to a different time, the key still refers to the original slot — which is exactly how RFC 5545 `RECURRENCE-ID` works.
+### What the nullable date buys you
 
----
-
-## Step 5: Recurrence — RRULE
-
-Rather than inventing a format, use **RFC 5545 RRULE** (the iCalendar standard). Every calendar client already speaks it.
-
-| Requirement | RRULE |
+| Row | Meaning |
 |---|---|
-| Every week on Tuesday | `FREQ=WEEKLY;BYDAY=TU` |
-| Every weekday | `FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR` |
-| Every 2 weeks, Mon + Thu | `FREQ=WEEKLY;INTERVAL=2;BYDAY=MO,TH` |
-| 2nd Tuesday of every month | `FREQ=MONTHLY;BYDAY=2TU` |
-| Last Friday monthly, 12 times | `FREQ=MONTHLY;BYDAY=-1FR;COUNT=12` |
-| Daily until 31 Dec 2026 | `FREQ=DAILY;UNTIL=20261231T235959Z` |
+| `bob · (no date) · ADDED · ACCEPTED` | Bob is on the meeting, accepted, **every** occurrence |
+| `bob · Aug 12 · REMOVED` | …except Aug 12, where he isn't invited |
+| `carol · Aug 12 · ADDED · PENDING` | Carol is invited to **only** Aug 12 |
+| `bob · Aug 19 · ADDED · DECLINED` | Bob's still invited Aug 19, but declined **that date** |
 
-```python
-from dateutil.rrule import rrulestr
-
-def expand(series, window_start, window_end):
-    """Materialise occurrence datetimes for a bounded window only."""
-    if not series.rrule:                       # single meeting
-        return [series.start_utc] if window_start <= series.start_utc <= window_end else []
-
-    rule = rrulestr(series.rrule, dtstart=series.start_utc)
-    return list(rule.between(window_start, window_end, inc=True))
-```
-
-### The timezone trap (interviewers love this)
-Store `start_utc` **and** the organiser's IANA `timezone`. A "10:00 every Tuesday" meeting must stay at 10:00 local across a DST shift — which means the UTC instant changes by an hour. Expanding purely in UTC silently drifts the meeting. **Expand in the series' local timezone, then convert each occurrence to UTC.**
+Four requirements, one table.
 
 ---
 
-## Step 6: Read Path — Loading a Calendar
+## Step 4: Recurrence Without RRULE
+
+You don't need RFC 5545. Four columns and simple date math cover everything an interview asks for.
+
+| Requirement | Columns |
+|---|---|
+| One-off meeting | `type=NONE` |
+| Every day | `type=DAILY, every=1` |
+| Every Tuesday, forever | `type=WEEKLY, every=1, days=TU, until=NULL` |
+| Every 2 weeks on Mon + Thu | `type=WEEKLY, every=2, days=MO,TH` |
+| Weekdays only | `type=WEEKLY, every=1, days=MO,TU,WE,TH,FR` |
+| Monthly on the 5th, until Dec | `type=MONTHLY, every=1, until=Dec 31` |
+
+**Expanding a window — the flow, no library:**
+
+```
+1. Clamp the window:  from = max(window_start, meeting.start)
+                      to   = min(window_end,   repeat_until or window_end)
+                      ← this clamp is what makes "forever" safe
+
+2. Walk the window in the meeting's LOCAL timezone:
+     DAILY    → step day by day, keep every Nth day from the start
+     WEEKLY   → for each day in range, keep it if
+                  (a) its weekday is in repeat_days, and
+                  (b) its week number is a multiple of repeat_every
+     MONTHLY  → keep the same day-of-month, every Nth month
+
+3. Convert each surviving local date back to UTC
+   ← convert AFTER stepping, never before, or DST breaks it
+
+4. Return the list (typically 4–5 dates for a month view)
+```
+
+**Why this is enough:** the exotic cases RRULE exists for ("last Friday of the month", "every 3rd weekday") are rare, and an interviewer cares that you *bounded the expansion*, not that you parsed a spec. If asked, say: *"I'd swap these columns for an RRULE string if the product needed full iCalendar interop — the expansion boundary stays identical."*
+
+---
+
+## Step 5: Reading a Calendar
 
 ```mermaid
 sequenceDiagram
     participant C as Client
-    participant CS as Calendar Service
-    participant R as Redis
+    participant S as Scheduler Service
     participant DB as PostgreSQL
 
-    C->>CS: GET /calendar?from=2026-08-01&to=2026-08-31
-    CS->>R: GET cal:user:u1:2026-08
-    alt cache hit
-        R-->>CS: expanded occurrences
-    else cache miss
-        CS->>DB: series for user overlapping window<br/>(join series_attendee)
-        DB-->>CS: N series rows (+ RRULEs)
-        CS->>DB: exceptions + occurrence_attendee<br/>for those series in window
-        DB-->>CS: deltas
-        CS->>CS: expand RRULE per series
-        CS->>CS: apply CANCELLED / MODIFIED
-        CS->>CS: apply roster + RSVP overrides
-        CS->>R: SETEX cal:user:u1:2026-08 300 {...}
-    end
-    CS-->>C: flat list of occurrences
+    C->>S: GET /calendar?from=Aug1&to=Aug31
+    S->>DB: meetings I'm on, overlapping Aug
+    DB-->>S: N meeting rows (+ repeat columns)
+    S->>DB: attendees + exceptions for those meetings
+    DB-->>S: defaults + per-date overrides
+    Note over S: expand pattern → ~4 dates each
+    Note over S: drop cancelled · apply overrides
+    S-->>C: flat list of occurrences
 ```
 
-The expansion algorithm, in order — **order matters**:
+The read is always these six steps, **in this order**:
 
-```python
-def calendar_view(user_id, window_start, window_end):
-    out = []
-    for series in series_for_user(user_id, window_start, window_end):
-        exceptions = load_exceptions(series.series_id, window_start, window_end)
-        deltas     = load_occurrence_attendees(series.series_id, window_start, window_end)
-
-        for dt in expand(series, window_start, window_end):
-            key = dt.date()
-            exc = exceptions.get(key)
-
-            # 1. Cancelled for this date only → skip entirely
-            if exc and exc.status == 'CANCELLED':
-                continue
-
-            occ = Occurrence(
-                series_id = series.series_id,
-                date      = key,
-                start     = (exc.override_start_utc if exc and exc.override_start_utc else dt),
-                duration  = (exc.override_duration_min if exc else None) or series.duration_min,
-                title     = (exc.override_title if exc else None) or series.title,
-            )
-
-            # 2. Start from the series roster
-            roster = {a.user_id: a.rsvp_status for a in series.attendees}
-
-            # 3. Apply the per-date roster delta
-            for d in deltas.get(key, []):
-                if d.membership == 'REMOVED':
-                    roster.pop(d.user_id, None)
-                else:
-                    roster[d.user_id] = d.rsvp_status or 'PENDING'
-
-            # 4. Per-occurrence RSVP overrides the series RSVP
-            for d in deltas.get(key, []):
-                if d.membership == 'ADDED' or d.user_id in roster:
-                    if d.rsvp_status:
-                        roster[d.user_id] = d.rsvp_status
-
-            # 5. The viewer may have been removed from just this date
-            if user_id not in roster:
-                continue
-
-            occ.attendees = roster
-            out.append(occ)
-    return sorted(out, key=lambda o: o.start)
+```
+1. FIND    which meetings am I on that could touch this window?
+2. EXPAND  run each pattern, only inside the window
+3. FILTER  drop dates marked CANCELLED
+4. APPLY   guest list = defaults (no date) → then overrides (this date)
+5. CHECK   am I still on the list for this date? if not, hide it
+6. SORT    return occurrences by start time
 ```
 
-**The rule to state in the interview:** *series is the default, occurrence is the override.* Everything is a resolution of `series value → exception override → occurrence-attendee override`.
+**Defaults first, overrides second.** That ordering *is* the design.
 
 ---
 
-## Step 7: Editing an Occurrence — the "This / This-and-Following / All" Problem
+## Step 6: The Four Write Operations
 
-Every calendar app asks this question. Each answer maps to a different write.
+| Action | What gets written | Series touched? |
+|---|---|---|
+| **Create weekly meeting, forever** | 1 meeting row (`repeat_until = NULL`) + 1 attendee row per person (no date) | — |
+| **Remove Bob from Aug 12 only** | 1 attendee row: `bob · Aug 12 · REMOVED` | ❌ No |
+| **Bob declines Aug 19 only** | 1 attendee row: `bob · Aug 19 · ADDED · DECLINED` | ❌ No |
+| **Cancel Aug 26** | 1 exceptions row: `Aug 26 · CANCELLED` | ❌ No |
+
+A 3-person weekly standup that runs forever is **4 rows**. Removing Bob from one Tuesday makes it **5**.
+
+After that single write:
+
+| Date | Defaults | Overrides | Result |
+|---|---|---|---|
+| Aug 5 | alice, bob, carol | — | Bob is there |
+| **Aug 12** | alice, bob, carol | **bob → REMOVED** | **Bob is gone** |
+| Aug 19 | alice, bob, carol | — | Bob is there |
+| …forever | | | Bob is there |
+
+> **`ADDED` + `DECLINED` is not the same as `REMOVED`.** Declined = invited but not coming (still on his calendar, greyed out). Removed = not invited (gone from his calendar).
+
+---
+
+## Step 7: Architecture
+
+```mermaid
+flowchart LR
+    C([Client]) --> GW[API Gateway]
+    GW --> S[Scheduler Service<br/>create · edit · RSVP · read]
+    S --> DB[(PostgreSQL)]
+    S <--> R[(Redis<br/>cached month view)]
+
+    S -->|invite / update / cancel<br/>send NOW| D[Dispatcher<br/>email · push]
+
+    B[Reminder Builder<br/>cron, every 15 min] --> DB
+    B -->|writes due rows| Q[(reminder_queue)]
+    Q --> D
+    D --> U([Attendees])
+
+    style C fill:#1f6feb,color:#fff
+    style DB fill:#3fb950,color:#fff
+    style R fill:#f85149,color:#fff
+    style B fill:#f0883e,color:#fff
+    style Q fill:#a371f7,color:#fff
+```
+
+| Component | Job |
+|---|---|
+| **Scheduler Service** | Owns the pattern and the expansion. Reads and writes both go through it, so expansion logic lives in exactly one place. |
+| **PostgreSQL** | The 3 tables + the reminder queue. |
+| **Redis** | Caches the *expanded* month view per user (TTL ~5 min). Reads are 100:1 and expansion is the only real work. Invalidated on any write touching that user. |
+| **Reminder Builder** | The scheduler you asked about. Turns infinite patterns into concrete, due-soon reminder rows. Detailed below. |
+| **Dispatcher** | The only thing that actually sends. Handles both immediate notifications and due reminders. |
+
+---
+
+## Step 8: Notifications — Two Completely Different Problems
+
+This is where most designs wave their hands. There are **two** kinds, and only one is hard.
+
+| | Trigger | When | Difficulty |
+|---|---|---|---|
+| **Immediate** | Someone did something — invited, updated, cancelled, RSVP'd | Right now | Easy — you're already in the request |
+| **Reminder** | *Nothing happened.* Time simply arrived. | "10 minutes before each occurrence" | **Hard** — the occurrence doesn't exist as a row |
+
+### Why reminders are hard
+
+```
+Meeting: "every Tuesday, forever", reminder 10 min before.
+→ How many reminders must exist?   ∞
+→ How many can you store?          not ∞
+```
+
+You cannot pre-create them. But you also can't scan every meeting every minute — with 100M users that's a full table sweep 1,440 times a day.
+
+### The answer: a rolling window materializer
+
+Only ever materialize **the next 24 hours**.
 
 ```mermaid
 flowchart TD
-    E([User edits a recurring meeting]) --> Q{Scope?}
+    CR([Cron: every 15 min]) --> F[Find meetings that could<br/>occur in next 24h]
+    F --> EX[Expand pattern<br/>for that 24h window ONLY]
+    EX --> SK[Drop CANCELLED dates]
+    SK --> RO[Resolve roster per date<br/>defaults → overrides]
+    RO --> DE[Drop DECLINED and REMOVED users]
+    DE --> W["INSERT into reminder_queue<br/>due_at = start − lead_time<br/><b>UNIQUE(meeting, date, user)</b>"]
 
-    Q -->|This occurrence only| A["INSERT occurrence_exception<br/>(series_id, date, MODIFIED)<br/>+ occurrence_attendee deltas<br/><b>series untouched</b>"]
-    Q -->|This and following| B["1. Set UNTIL = date-1 on old series<br/>2. CREATE new series from date<br/>3. Copy roster forward<br/><b>series split</b>"]
-    Q -->|Entire series| C["UPDATE event_series<br/>(bump version)<br/><b>exceptions preserved</b>"]
+    W --> Q[(reminder_queue)]
 
-    A --> N[Kafka: occurrence.updated<br/>notify only that date's attendees]
-    B --> N2[Kafka: series.split<br/>notify all future attendees]
-    C --> N3[Kafka: series.updated<br/>notify all attendees]
+    T([Cron: every minute]) --> CL["Claim due rows<br/>WHERE due_at ≤ now AND PENDING<br/>SKIP LOCKED"]
+    Q --> CL
+    CL --> SD[Send push / email]
+    SD --> MK[Mark SENT]
 
-    style E fill:#1f6feb,color:#fff
+    style CR fill:#f0883e,color:#fff
+    style T fill:#f0883e,color:#fff
+    style Q fill:#a371f7,color:#fff
+    style W fill:#3fb950,color:#fff
+```
+
+**Two loops, deliberately separate:**
+
+| Loop | Frequency | Job | Why separate |
+|---|---|---|---|
+| **Builder** | Every 15 min | Pattern → concrete rows for next 24h | Expansion is expensive; doing it hourly is fine |
+| **Dispatcher** | Every minute | Send whatever is due | Sending must be punctual; it's a cheap indexed query |
+
+If they were one loop you'd either expand everything every minute (wasteful) or send reminders 15 minutes late (broken).
+
+### The queue table
+
+```sql
+reminder_queue (
+  meeting_id      UUID,
+  occurrence_date DATE,
+  user_id         UUID,
+  due_at          TIMESTAMPTZ,   -- occurrence start − user's lead time
+  status          TEXT,          -- PENDING | SENT
+  PRIMARY KEY (meeting_id, occurrence_date, user_id)
+)
+CREATE INDEX ix_due ON reminder_queue (due_at) WHERE status = 'PENDING';
+```
+
+That primary key is doing real work — it makes the builder **idempotent**. Re-running it inserts nothing new (`ON CONFLICT DO NOTHING`), so a crashed or overlapping run is harmless.
+
+### What happens when things change
+
+| Event | Handling |
+|---|---|
+| Meeting time changed | Delete `PENDING` rows for affected dates; next builder pass regenerates them |
+| Occurrence cancelled | Delete `PENDING` rows for that date |
+| Attendee removed from one date | Delete that user's `PENDING` row for that date |
+| Attendee added < 24h before | The write path materializes their reminder immediately, rather than waiting for the next builder tick |
+| Builder crashes mid-run | Rows are `PENDING`; the unique key means the retry can't duplicate |
+| Dispatcher crashes after sending | Worst case a duplicate send — dedupe on `(meeting, date, user)` at the notification layer |
+| Two dispatchers run at once | `SKIP LOCKED` means each row is claimed by exactly one worker |
+
+### Why bound it at 24 hours
+
+| Window | Queue size | Rebuild cost |
+|---|---|---|
+| Forever | ∞ | impossible |
+| 1 year | billions of rows | huge |
+| **24 hours** | **bounded by real meetings/day** | **small, and self-healing** |
+
+Short window = small table, and edits mostly land *before* materialization, so there's less to clean up. It also means a bad deploy only corrupts one day of reminders, and the next run repairs it.
+
+> **Alternative worth naming:** a Redis sorted set scored by `due_at`, popped with `ZRANGEBYSCORE`. Faster, but you lose durability and easy inspection. Postgres + `SKIP LOCKED` is the boring, correct default.
+
+### Immediate notifications
+Invites, updates, cancellations and RSVP changes are just fan-outs on the write path — resolve the roster for the affected date(s), hand the list to the Dispatcher, return. Keep it off the critical path (queue it) so creating a meeting stays fast.
+
+---
+
+## Step 9: Editing — "This / This and Following / All"
+
+```mermaid
+flowchart TD
+    Q{Edit scope?}
+    Q -->|This occurrence| A["Write a dated override row<br/><b>series untouched</b>"]
+    Q -->|This and following| B["1. repeat_until = date − 1<br/>2. new meeting from date<br/>3. copy roster<br/><b>series splits in two</b>"]
+    Q -->|All| C["UPDATE the meeting row<br/><b>overrides are kept</b>"]
+
+    A --> R[Rebuild reminders<br/>for affected dates]
+    B --> R
+    C --> R
+
     style A fill:#3fb950,color:#fff
     style B fill:#f0883e,color:#fff
     style C fill:#a371f7,color:#fff
 ```
 
-### Add / remove a user from ONE occurrence
-
-This is the requirement that the exceptions model exists for.
-
-```sql
--- Remove Bob from ONLY Tuesday 12 Aug 2026
-INSERT INTO occurrence_attendee (series_id, occurrence_date, user_id, membership)
-VALUES ('s-101', '2026-08-12', 'u-bob', 'REMOVED')
-ON CONFLICT (series_id, occurrence_date, user_id)
-DO UPDATE SET membership = 'REMOVED';
-
--- Add Carol to ONLY that same Tuesday
-INSERT INTO occurrence_attendee (series_id, occurrence_date, user_id, membership, rsvp_status)
-VALUES ('s-101', '2026-08-12', 'u-carol', 'ADDED', 'PENDING')
-ON CONFLICT (series_id, occurrence_date, user_id)
-DO UPDATE SET membership = 'ADDED';
-```
-
-Nothing in `event_series` or `series_attendee` changes. Every other Tuesday still has Bob and not Carol. **Two small rows express a change to one date out of infinity.**
-
-### Cancel a single occurrence
-```sql
-INSERT INTO occurrence_exception (series_id, occurrence_date, status)
-VALUES ('s-101', '2026-08-19', 'CANCELLED');
-```
-The expansion loop skips it. The rule still generates 26 Aug normally.
-
-### Why "this and following" splits the series
-You cannot express "different from this date onward" with one rule plus exceptions without writing an exception for every remaining date. So: bound the old series with `UNTIL = date - 1`, create a new series starting at `date`, and carry the roster over. Old exceptions before the split point stay attached to the old series — which is correct, because they describe the past.
+**Why "this and following" must split:** a single pattern can't say *"different from here onward."* So you end the old pattern with `repeat_until` and start a new meeting from that date. Past exceptions stay attached to the old meeting — correct, because they describe the past.
 
 ---
 
-## Step 8: RSVP — Accept / Reject
+## Step 10: Three Gotchas
 
-```mermaid
-stateDiagram-v2
-    [*] --> PENDING : invite created
-    PENDING --> ACCEPTED : accept
-    PENDING --> DECLINED : reject
-    PENDING --> TENTATIVE : maybe
-    ACCEPTED --> DECLINED : change mind
-    DECLINED --> ACCEPTED : change mind
-    TENTATIVE --> ACCEPTED : confirm
-    TENTATIVE --> DECLINED : reject
-    ACCEPTED --> [*] : occurrence cancelled
-    DECLINED --> [*] : occurrence cancelled
-```
+**① Removal must be written, never deleted.**
+No row means *inherit from the series*. Delete Bob's Aug 12 override and the default silently re-adds him. Only someone who was `ADDED` for a single date can safely be deleted.
+> The #1 bug in this design — naming it is a strong interview signal.
 
-Two granularities, resolved in this order:
+**② Expand in local time, then convert to UTC.**
+"10:00 every Tuesday" must **stay** 10:00 across a daylight-saving switch — meaning the true UTC instant shifts by an hour. Repeatedly adding "7 days" to a UTC timestamp drifts the meeting to 9:00 or 11:00.
 
-| Write | Table | Meaning |
-|---|---|---|
-| "Accept the whole series" | `series_attendee.rsvp_status` | Default answer for every occurrence |
-| "Decline just next Tuesday" | `occurrence_attendee.rsvp_status` (`membership='ADDED'`, i.e. still invited) | Overrides the series answer for that date only |
-
-```mermaid
-sequenceDiagram
-    participant B as Bob (attendee)
-    participant RS as RSVP Service
-    participant DB as PostgreSQL
-    participant K as Kafka
-    participant NS as Notification Service
-    participant A as Alice (organizer)
-
-    B->>RS: POST /rsvp {seriesId, date: 2026-08-12, status: DECLINED}
-    Note over RS: date present → occurrence-level
-    RS->>DB: UPSERT occurrence_attendee<br/>(s-101, 2026-08-12, bob, ADDED, DECLINED)
-    DB-->>RS: ok
-    RS->>K: publish rsvp.changed
-    RS-->>B: 200 OK
-    K->>NS: consume
-    NS->>A: push "Bob declined 12 Aug"
-    K->>K: cache invalidator drops cal:user:*:2026-08
-```
-
-**Idempotency:** RSVP endpoints are `UPSERT` on the primary key, so a double-tap or a client retry is naturally safe — no idempotency key needed. Contrast with meeting *creation*, which does need one.
-
----
-
-## Step 9: Conflict Detection & Find-a-Time
-
-```python
-def is_free(user_id, start, end):
-    for occ in calendar_view(user_id, start - MAX_DURATION, end):
-        if occ.rsvp_of(user_id) == 'DECLINED':
-            continue                                  # declined ≠ busy
-        if occ.start < end and start < occ.end:       # interval overlap
-            return False
-    return True
-```
-
-The overlap test is the classic `a.start < b.end AND b.start < a.end`. Note the window is widened by `MAX_DURATION` on the left — a 3-hour meeting starting *before* your window can still overlap it.
-
-**Find-a-time** for N attendees: expand each attendee's calendar for the search window, merge all busy intervals, sort by start, sweep to find gaps ≥ the requested duration. This is why the expansion result is cached — a 10-person "find a time" is 10 calendar loads.
-
----
-
-## Step 10: Scaling
-
-| Concern | Approach |
-|---|---|
-| **Read amplification** | Cache the expanded view per `user + month` in Redis (TTL 5 min). Invalidate via the Kafka `calendar-events` consumer, not TTL alone. |
-| **Sharding** | Shard by `user_id` for the attendee-index path; series rows replicated/looked up by `series_id`. A meeting spanning shards is read by fan-out over attendee shards. |
-| **Hot calendars** | Meeting-room and shared "team" calendars have thousands of readers → cache aggressively, serve from a read replica. |
-| **Unbounded recurrence** | Cap expansion at the requested window; never expand "forever". Reject windows > 1 year. |
-| **Reminder fan-out** | A separate scheduler consumes `calendar-events`, expands only the **next 24 hours**, and enqueues delayed jobs — the DB is never polled per-minute. |
-| **Concurrent edits** | Optimistic locking with `event_series.version`; a stale write returns 409 and the client re-fetches. |
-
----
-
-## Deep Dives
-
-### Why not just store occurrences and be done with it?
-For a *fixed, short* series (a 6-week course) materialising is genuinely fine and simpler. The rule-based model earns its complexity when series are **open-ended** or **long**. A good answer names this trade-off rather than treating rule-expansion as universally correct: *"I'd materialise if every series had a hard, short bound; I'm choosing rules because 'weekly standup, no end date' is the common case."*
-
-### What happens to exceptions when the series is edited?
-Keep them. If the organiser moves the whole series from 10:00 to 11:00, an occurrence that was individually moved to 15:00 **stays at 15:00** — the user explicitly overrode that date. This is what real calendars do, and stating it shows you've thought past the happy path. (Some products prompt "reset overrides?" — mention it as a product decision, not a technical one.)
-
-### Deleting an attendee who was added to only one occurrence
-`membership` flips from `ADDED` to `REMOVED` — or the row is deleted, since absence from `occurrence_attendee` means "fall back to the series roster", and they were never on it. Deleting is cleaner. But if they were on the **series** roster, you must write an explicit `REMOVED` row; deleting would silently re-add them.
-
-> This asymmetry is the single most common bug in this design. **Absence means "inherit from series", so removal must be explicit.**
-
-### Why is RSVP a separate service?
-Volume and blast radius. Every invited user RSVPs, so RSVP writes outnumber organiser edits by an order of magnitude, and an RSVP must never lock a row the organiser is editing. Separate services also let you scale and rate-limit them independently.
-
-### Timezone + DST, concretely
-A weekly 10:00 IST meeting has no DST problem (India has no DST). The same meeting for a New York organiser shifts UTC instant by one hour in March and November. Expand in local time using the stored IANA zone, then convert — never add `7 * 24h` to a UTC timestamp.
+**③ Editing the series doesn't erase overrides.**
+Move the series 10:00 → 11:00 and a Tuesday someone dragged to 15:00 **stays at 15:00**. They overrode it deliberately. (Some products prompt *"reset overrides?"* — a product call, not a technical one.)
 
 ---
 
 ## Interview Cheat Sheet
 
-| Question | One-line answer |
+**What you draw (5 min, two pictures):** the 3-table diagram from Step 3, and the architecture from Step 7. If reminders come up, add the two-loop builder/dispatcher sketch.
+
+| Question | Answer |
 |---|---|
-| How do you store a recurring meeting? | One series row with an RFC 5545 RRULE — occurrences are derived on read, not stored. |
-| How do you edit one occurrence? | Write an `occurrence_exception` row keyed by `(series_id, original_date)`; the series is untouched. |
-| How do you remove one person from one date? | An `occurrence_attendee` row with `membership='REMOVED'` — the series roster is the default, the delta is the override. |
-| Why must removal be an explicit row? | Because "no row" means "inherit the series roster", so deleting would re-add them. |
-| How does "this and following" work? | Set `UNTIL` on the old series, create a new series from that date, copy the roster. |
-| Per-occurrence RSVP? | `occurrence_attendee.rsvp_status` overrides `series_attendee.rsvp_status` for that date only. |
-| How do you keep reads fast? | Cache the expanded month view per user in Redis; invalidate from the Kafka event stream. |
-| Biggest trap? | Expanding recurrence in UTC and breaking DST — expand in the series' local timezone. |
+| How do you store a recurring meeting? | One row with repeat columns. Occurrences are computed on read, never stored. |
+| A weekly meeting with no end date? | `repeat_until = NULL`. Still one row — infinity is in the pattern, not the table. |
+| Do you need RRULE? | No. Four columns cover daily/weekly/monthly. Swap in RRULE only if you need iCalendar interop. |
+| Remove one person from one occurrence? | One attendee row with that date and `membership = REMOVED`. |
+| Why is `occurrence_date` nullable? | Empty = default for all occurrences; a date = override for that date. One table instead of two. |
+| Why can't you DELETE to remove someone? | No row means "inherit from the series", so the default re-adds them. |
+| **Where do reminders come from?** | **A builder cron materializes only the next 24h of occurrences into a queue; a dispatcher sends what's due each minute.** |
+| Why not scan all meetings every minute? | Full-table sweep 1,440×/day. The builder expands once per 15 min into a bounded queue instead. |
+| How are reminders idempotent? | `PRIMARY KEY (meeting, date, user)` + `ON CONFLICT DO NOTHING`, so re-runs are safe. |
+| Two dispatchers at once? | `SELECT … FOR UPDATE SKIP LOCKED` — each row is claimed once. |
+| "This and following"? | End the old pattern with `repeat_until`, start a new meeting from that date, copy the roster. |
+| Biggest trap? | Expanding in UTC and breaking DST. Expand in the meeting's local timezone. |
