@@ -1,103 +1,131 @@
 # Elasticsearch Notes
 
-## What is Elasticsearch?
+## 1. Core purpose
 
-Elasticsearch is a distributed, open-source search and analytics engine built on Apache Lucene. It provides a RESTful API and is designed for horizontal scalability, reliability, and real-time search capabilities.
+Elasticsearch is a distributed search engine built on Lucene that uses an inverted index to enable fast full-text search and analytics at scale.
 
-## Storage or Compute?
+**In simple terms:** Elasticsearch is like a library catalog for your documents. It reads and organizes their words beforehand, so when you search for a word or phrase, it can quickly find, count and return the matching documents without reading every document from beginning to end each time.
 
-**Elasticsearch is both — it stores data AND computes over it.**
+Elasticsearch performs indexing work so repeated searches do not scan every document again. Its primary benefit is fast, scalable repeated search. It usually consumes additional storage rather than reducing it.
 
-| Role | Details |
+```
+Receive document
+  -> analyze text fields
+  -> build inverted index
+  -> store original source (_source)
+  -> search and retrieve results
+```
+
+## 2. Inverted index
+
+**Forward view (what you store):**
+```
+Doc 1: "Virat Kohli scored a century"
+Doc 2: "Rohit Sharma and Virat Kohli played well"
+Doc 3: "Virat played cricket with Kohli"
+```
+
+**Inverted view (what Elasticsearch builds):**
+```
+virat   -> [Doc 1, Doc 2, Doc 3]
+kohli   -> [Doc 1, Doc 2, Doc 3]
+century -> [Doc 1]
+scored  -> [Doc 1]
+played  -> [Doc 2, Doc 3]
+```
+
+Lucene uses a term dictionary and compressed postings lists. A posting can include document ID, term frequency and token positions. Searching is fast because you look up terms in the dictionary, get the postings list, intersect them, and rank results — no full document scans.
+
+## 3. Mappings and analysis
+
+| Field type | Behavior | Example |
+|---|---|---|
+| `text` | Analyzed into tokens; search uses inverted index | Article content |
+| `keyword` | Indexed as one exact value; no analysis | URL, status, category |
+| number/date | Uses type-specific structures; range queries | Views, publication time |
+
+Analysis transforms raw text during indexing:
+- Lowercasing: "VIRAT" → "virat"
+- Stemming: "playing" → "play" (matches "played")
+- Stop-word removal: ignore "the", "and", "a"
+- Synonyms: "CEO" → "chief executive officer"
+- N-grams: "kohli" → "k", "o", "h", "l", "i", "ko", "oh", ... (enables prefix matching)
+
+Phrase matching uses positions in the analyzed token stream. Lowercasing, stemming, stop-word filters, synonyms and phrase slop can change results.
+
+## 4. Virat Kohli phrase example
+
+**Documents:**
+```
+Doc 1: "Virat Kohli scored a century"
+Doc 2: "Rohit Sharma and Virat Kohli played well"
+Doc 3: "Virat played cricket with Kohli"
+Doc 4: "Kohli is a famous cricketer"
+```
+
+**Search query: "virat kohli" (exact phrase)**
+
+| Document | virat position | kohli position | Phrase match? |
+|---|---|---|---|
+| 1 | 0 | 1 | Yes |
+| 2 | 3 | 4 | Yes |
+| 3 | 0 | 4 | No |
+| 4 | Absent | 0 | No |
+
+**How the search works:**
+```
+virat documents: [1, 2, 3]
+kohli documents: [1, 2, 3, 4]
+intersection: [1, 2, 3]
+position verification: [1, 2]  (positions are adjacent)
+matching document count: 2
+```
+
+Phrase matching requires position checks. Simply intersecting postings lists gives candidates; then positions are verified. This counts matching documents. Counting every phrase occurrence requires additional position/term-vector processing or a count stored during ingestion.
+
+## 5. What is stored?
+
+| Information | Purpose |
 |---|---|
-| **Storage** | Documents are persisted to disk in Lucene segment files. Data survives restarts. |
-| **Compute** | Search ranking (BM25), aggregations, geo queries, and analytics all run inside ES nodes. |
-| **NOT a primary DB** | Lacks ACID transactions, foreign keys, and strong consistency. Don't use as your source of truth. |
-| **Typical pattern** | Write to your primary DB (Postgres/MySQL) first → sync to Elasticsearch for search/analytics. |
+| `_source` | Original JSON used for retrieval and re-indexing |
+| Term dictionary | Locate indexed terms |
+| Postings lists | Locate documents containing terms |
+| Frequency and positions | Scoring, phrase and proximity queries |
+| `doc_values` | Sorting and aggregations |
+| Metadata | Index, ID, version and sequence information |
 
-> **Rule of thumb**: Elasticsearch owns the search/analytics layer. Your relational or document DB owns the source of truth. They stay in sync via CDC (Change Data Capture) or dual-writes.
+**Search flow:**
+```
+query term
+  -> term dictionary
+  -> postings list
+  -> candidate IDs
+  -> frequency/position checks
+  -> retrieve JSON from _source
+```
 
-## Why Elasticsearch?
+Positions are details associated with postings; they are not a replacement for the inverted index.
 
-* **When SQL LIKE/ILIKE is too slow**: Full-text search across millions of documents in milliseconds
-* **Relevance matters**: You need ranked results, not just exact matches (BM25 scoring)
-* **Scale reads horizontally**: Add more nodes to scale search capacity without changing application code
-* **Analytics on top of search**: Run aggregations and dashboards on the same data you search
-* **Unstructured / semi-structured data**: Schema-free indexing lets you evolve your data model without migrations
-* **Log & event analysis**: Ingest, search, and visualize billions of log lines (ELK stack)
-* **Near real-time**: New documents appear in search within ~1 second of indexing
+## 6. Time and operational trade-offs
 
-## Common Use Cases
+| Operation | Simplified cost |
+|---|---|
+| Index all tokens | O(total tokens) |
+| Add one document | O(words in that document) |
+| Scan without index | O(all document text) per query |
+| Indexed query | Depends on postings, scoring, aggregation and shards |
 
-### 1. E-commerce / Site Search
-* Users search for products with typos, synonyms, and partial words — SQL can't handle this well
-* Elasticsearch provides fuzzy matching, synonym expansion, and faceted filters (brand, price range, category)
-* Relevance scoring ensures the best-matching product appears first
-* **Example**: Amazon, Flipkart — "iphone charger" returns results even if indexed as "iPhone Charging Cable"
+Elasticsearch search is not simply O(1). Rare terms are generally cheaper than common terms. Phrase checks, BM25 scoring, result collection and shard fan-out add work.
 
-### 2. Log & Metrics Analytics (ELK Stack)
-* Applications emit millions of log lines per minute — you need to search and aggregate them fast
-* Logstash / Filebeat ships logs → Elasticsearch indexes them → Kibana visualizes them
-* Supports structured (JSON logs) and unstructured (plain text) log formats
-* **Example**: Find all 5xx errors from a specific service in the last 1 hour, grouped by endpoint
+Lucene uses immutable segments. Refreshes make new segments searchable, merging combines segments, and updates behave like delete plus re-index.
 
-### 3. Full-text Document Search
-* Index PDFs, wiki articles, support tickets, emails — anything with text content
-* Users can search by keywords and get results ranked by relevance
-* Supports highlighting (show which part of doc matched the query)
-* **Example**: Confluence, Notion, legal document management systems
+## 7. When Elasticsearch is unnecessary
 
-### 4. Real-time Monitoring Dashboards
-* Aggregations compute metrics (p99 latency, error rate, req/sec) over large datasets in real time
-* Date histogram aggregations power time-series charts
-* Combine search + aggregation: "show me error rate for service=payments in last 24h"
-* **Example**: Kibana dashboards for infrastructure monitoring, APM (Application Performance Monitoring)
-
-### 5. Security / SIEM
-* Ingest events from firewalls, IDS, auth systems — correlate across sources
-* Detect anomalies: unusual login times, access from new IPs, privilege escalation patterns
-* Retention and search across months of audit logs
-* **Example**: Elastic SIEM, Splunk-like threat hunting
-
-### 6. Geo / Location Search
-* Store lat/lon coordinates and query by distance, bounding box, or polygon
-* Combine geo filters with full-text (e.g., "coffee shops within 2km that are open now")
-* **Example**: Zomato / Swiggy finding restaurants near a user, Uber finding nearby drivers
-
-### 7. Autocomplete & Type-ahead Suggestions
-* Completion suggester uses a special in-memory data structure (FST) for sub-millisecond suggestions
-* Search-as-you-type field type indexes n-grams for prefix matching
-* **Example**: Google-style suggestions as users type in a search box
-
-### 8. Recommendation Signals (More-Like-This)
-* Given a document (article, product), find similar ones based on shared terms
-* Used as a lightweight recommendation engine without ML complexity
-* **Example**: "Related articles" sidebar on a blog, "Customers also viewed" on e-commerce
-
-## Key Features
-
-- **Full-text search**: Advanced text search with relevance scoring
-- **Distributed architecture**: Horizontal scaling across multiple nodes
-- **Real-time indexing**: Near real-time search capabilities (1 second refresh)
-- **RESTful API**: JSON-based HTTP API for all operations
-- **Schema-free**: Dynamic mapping for JSON documents
-- **Analytics**: Aggregations for complex data analysis
-- **Multi-tenancy**: Multiple indices with different configurations
-
-## Core Concepts
-
-### Document
-- Basic unit of information that can be indexed
-- Expressed in JSON format
-- Similar to a row in a relational database
-
-### Index
-- Collection of documents with similar characteristics
-- Similar to a database in relational systems
-- Named in lowercase
-
-### Shard
-- A single Lucene index containing a subset of documents
+- A small dataset or one-time search can be scanned directly.
+- Exact key lookup can use a normal database index.
+- One permanent condition can be counted during ingestion.
+- Transactional consistency may be more important than search.
+- Real-time updates critical — Elasticsearch's ~1 second refresh means staleness.
 - Each index is divided into multiple shards for distribution
 - **Primary shard**: Original shard containing documents
 - **Replica shard**: Copy of primary shard for redundancy and read scaling
