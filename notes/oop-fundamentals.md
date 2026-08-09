@@ -378,6 +378,91 @@ for brake in brakes:
 - **Simplicity**: Bike code doesn't care which brake type it uses
 - **Loose coupling**: Brake implementations are independent
 
+### Costs & Trade-offs: The Indirection Problem
+
+**The Trade-off**: While polymorphism is powerful, it introduces **abstraction indirection**—a cognitive and performance cost.
+
+### Real-World Example: NotificationSender Problem
+
+```
+A codebase has 47 classes implementing NotificationSender:
+├── EmailSender
+├── SMSSender
+├── SlackSender
+├── PushNotificationSender
+├── TelegramSender
+├── WebhookSender
+├── ... 41 more implementations
+
+When you call: sender.send(message)
+Question: Which implementation runs? 🤔
+```
+
+**This is the INDIRECTION COST** - harder to trace, debug, and understand code flow.
+
+### Three Costs of Polymorphism
+
+| Cost | Impact | Example |
+|------|--------|---------|
+| **Cognitive** | Hard to know which implementation runs | 47 NotificationSender classes - which one executes? |
+| **Navigation** | IDE can't jump directly to implementation | `sender.send()` - which file to open? |
+| **Performance** | Runtime overhead from virtual method lookup | Tiny but measurable in hot loops |
+
+### Coding Example: The Indirection Problem (Python)
+
+```python
+# With 47 implementations, this line is ambiguous:
+notification_sender.send("Hello")  # Which sender? Email? SMS? Slack?
+
+# Compare with concrete code (NO polymorphism):
+email_sender.send("Hello")  # Clear: it's EMAIL
+
+# With polymorphism, you must trace:
+# 1. Where does notification_sender come from?
+# 2. What type was it instantiated as?
+# 3. Search through 47 implementations
+# 4. Find the right one based on context
+```
+
+### When Indirection is Worth It
+
+```python
+# POLYMORPHISM GOOD: Clean, extensible, loosely coupled
+class NotificationService:
+    def __init__(self, sender: NotificationSender):
+        self.sender = sender  # Could be ANY sender
+    
+    def alert_user(self, user_id, message):
+        # Don't care which sender - abstraction hides it
+        self.sender.send(message)
+
+# Add new sender? Just implement NotificationSender
+class InstagramSender(NotificationSender):
+    def send(self, message):
+        # No need to change NotificationService!
+        pass
+
+# POLYMORPHISM BAD: Overkill, over-engineered
+class AuthService:
+    def __init__(self, password_hasher: PasswordHasher):
+        self.hasher = password_hasher
+    
+    def login(self, username, password):
+        # Only ever use bcrypt_hasher - why abstract?
+        # This creates indirection for no benefit
+        return self.hasher.hash(password)
+```
+
+### Decision Matrix
+
+| Scenario | Use Polymorphism? | Why |
+|----------|-------------------|-----|
+| **5 implementations, frequent additions** | ✅ YES | Extensibility wins over indirection |
+| **47 implementations, rarely changed** | ⚠️ MAYBE | Indirection cost high, need code navigation tools |
+| **1-2 implementations, stable** | ❌ NO | Indirection cost > flexibility benefit |
+| **Framework/library code** | ✅ YES | Users will extend it; flexibility critical |
+| **Business logic, single responsibility** | ❌ NO | Keep it concrete, simple to understand |
+
 ---
 
 ## 5. Composition
