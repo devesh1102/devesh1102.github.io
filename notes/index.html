@@ -4,7 +4,7 @@
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>System Design Notes — Devesh Kumar</title>
-  <meta name="description" content="System design and HLD notes by Devesh Kumar — Kafka, Redis, Elasticsearch, Bloom Filters, and more."/>
+  <meta name="description" content="HLD and LLD notes by Devesh Kumar — concepts, design patterns, and practical system design examples."/>
   <link rel="icon" href="../favicon.svg" type="image/svg+xml"/>
   <link rel="preconnect" href="https://fonts.googleapis.com"/>
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
@@ -35,6 +35,86 @@
     .page-header { margin-bottom: 48px; }
     .page-header h1 { font-size: 36px; font-weight: 700; letter-spacing: -0.8px; margin-bottom: 8px; }
     .page-header p { color: var(--muted); font-size: 15px; }
+
+    .section-nav {
+      display: flex;
+      gap: 10px;
+      margin-top: 24px;
+    }
+    .section-nav a {
+      color: var(--text);
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 8px 16px;
+      font-size: 13px;
+      font-weight: 600;
+    }
+    .section-nav a:hover { border-color: var(--accent); color: var(--accent); }
+
+    .notes-section { margin-top: 52px; scroll-margin-top: 80px; }
+    .notes-section:first-of-type { margin-top: 0; }
+    .notes-section summary {
+      list-style: none;
+      cursor: pointer;
+    }
+    .notes-section summary::-webkit-details-marker { display: none; }
+    .section-heading {
+      display: flex;
+      align-items: flex-start;
+      gap: 14px;
+      margin-bottom: 28px;
+    }
+    .section-heading .section-icon {
+      width: 44px;
+      height: 44px;
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+    .section-heading h2 { font-size: 24px; margin-bottom: 5px; }
+    .section-heading p { color: var(--muted); font-size: 14px; line-height: 1.6; }
+    .section-toggle {
+      display: none;
+    }
+    .notes-section[open] .section-toggle i { transform: rotate(180deg); }
+    .section-toggle i { transition: transform 0.2s ease; }
+    .notes-group + .notes-group { margin-top: 36px; }
+    .notes-group details {
+      background: transparent;
+    }
+    .notes-group summary {
+      list-style: none;
+      cursor: pointer;
+    }
+    .notes-group summary::-webkit-details-marker { display: none; }
+    .group-title {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.8px;
+      text-transform: uppercase;
+      margin-bottom: 14px;
+    }
+    .group-title::after {
+      content: "";
+      height: 1px;
+      background: var(--border);
+      flex: 1;
+    }
+    .group-toggle {
+      display: inline-flex;
+      margin-left: auto;
+      color: var(--muted);
+    }
+    .notes-group details[open] .group-toggle i { transform: rotate(180deg); }
+    .group-toggle i { transition: transform 0.2s ease; }
+    .group-body { margin-top: 14px; }
 
     .notes-grid {
       display: grid;
@@ -82,6 +162,12 @@
     }
     .note-arrow { color: var(--muted); font-size: 12px; }
     .note-card:hover .note-arrow { color: var(--accent); }
+
+    @media (max-width: 560px) {
+      .page { padding-top: 36px; }
+      .page-header h1 { font-size: 30px; }
+      .section-nav { flex-wrap: wrap; }
+    }
   </style>
 </head>
 <body>
@@ -94,11 +180,35 @@
 
 <div class="page">
   <div class="page-header">
-    <h1>System Design Notes</h1>
-    <p>HLD concepts, deep dives, and design patterns — my personal study notes</p>
+    <h1>Design Notes</h1>
+    <p>High-level and low-level design concepts with practical, interview-ready examples.</p>
+    <div class="section-nav">
+      <a href="#hld"><i class="fas fa-sitemap"></i>&nbsp; HLD</a>
+      <a href="#lld"><i class="fas fa-cubes"></i>&nbsp; LLD</a>
+    </div>
   </div>
 
-  <div class="notes-grid">
+  <details class="notes-section" id="hld" open>
+    <summary>
+      <div class="section-heading">
+        <div class="section-icon" style="background:rgba(88,166,255,0.12);color:var(--accent)"><i class="fas fa-sitemap"></i></div>
+        <div>
+          <h2>High-Level Design (HLD)</h2>
+          <p>Architecture, scalability, data flow, infrastructure choices, and complete distributed-system designs.</p>
+        </div>
+      </div>
+    </summary>
+
+    <div class="notes-group">
+      <details open>
+        <summary>
+          <div class="group-title">
+            <i class="fas fa-book-open"></i> Concepts
+            <span class="group-toggle" aria-hidden="true"><i class="fas fa-chevron-up"></i></span>
+          </div>
+        </summary>
+        <div class="group-body">
+          <div class="notes-grid">
 
     <a href="reader.html?file=kafka" class="note-card">
       <div class="note-icon" style="background:rgba(240,136,62,0.12); color:var(--orange)"><i class="fas fa-stream"></i></div>
@@ -210,6 +320,22 @@
       </div>
     </a>
 
+          </div>
+        </div>
+      </details>
+    </div>
+
+    <div class="notes-group">
+      <details open>
+        <summary>
+          <div class="group-title">
+            <i class="fas fa-diagram-project"></i> Examples & Patterns
+            <span class="group-toggle" aria-hidden="true"><i class="fas fa-chevron-up"></i></span>
+          </div>
+        </summary>
+        <div class="group-body">
+          <div class="notes-grid">
+
     <a href="reader.html?file=whatsapp-chat" class="note-card">
       <div class="note-icon" style="background:rgba(63,185,80,0.12); color:var(--green)"><i class="fab fa-whatsapp"></i></div>
       <h3>WhatsApp — Chat System</h3>
@@ -270,6 +396,46 @@
       </div>
     </a>
 
+    <a href="reader.html?file=hotel-booking" class="note-card">
+      <div class="note-icon" style="background:rgba(163,113,247,0.12); color:#a371f7"><i class="fas fa-hotel"></i></div>
+      <h3>Hotel Booking</h3>
+      <p>No double booking via per-night Redis locks + DB CAS, one-row-per-night availability model, geo search with availability counter, and real-time multiplier-based pricing.</p>
+      <div class="note-footer">
+        <span class="note-tag" style="background:rgba(163,113,247,0.12);color:#a371f7">Design Example</span>
+        <span class="note-arrow"><i class="fas fa-arrow-right"></i></span>
+      </div>
+    </a>
+
+    <a href="reader.html?file=notification-service" class="note-card">
+      <div class="note-icon" style="background:rgba(210,153,34,0.12); color:#d29922"><i class="fas fa-bell"></i></div>
+      <h3>Notification Service</h3>
+      <p>Fan-out to millions of subscribers, Kafka per-channel topics, APNs/FCM for mobile push, retry with exponential backoff, DLQ, and idempotency via Redis.</p>
+      <div class="note-footer">
+        <span class="note-tag" style="background:rgba(210,153,34,0.12);color:#d29922">Design Example</span>
+        <span class="note-arrow"><i class="fas fa-arrow-right"></i></span>
+      </div>
+    </a>
+
+    <a href="reader.html?file=uber" class="note-card">
+      <div class="note-icon" style="background:rgba(62,175,124,0.12); color:#3eaf7c"><i class="fas fa-car"></i></div>
+      <h3>Uber</h3>
+      <p>Real-time driver matching with Redis GEORADIUS, 600K GPS writes/sec, geohash spatial indexing, sequential driver offering, and live trip tracking via WebSockets.</p>
+      <div class="note-footer">
+        <span class="note-tag" style="background:rgba(62,175,124,0.12);color:#3eaf7c">Design Example</span>
+        <span class="note-arrow"><i class="fas fa-arrow-right"></i></span>
+      </div>
+    </a>
+
+    <a href="reader.html?file=ticketmaster" class="note-card">
+      <div class="note-icon" style="background:rgba(88,166,255,0.12); color:#58a6ff"><i class="fas fa-ticket-alt"></i></div>
+      <h3>Ticketmaster</h3>
+      <p>Distributed seat locking with Redis NX, no double-booking under 10M concurrent users, Elasticsearch search, thundering herd queue, and idempotent bookings.</p>
+      <div class="note-footer">
+        <span class="note-tag" style="background:rgba(88,166,255,0.12);color:#58a6ff">Design Example</span>
+        <span class="note-arrow"><i class="fas fa-arrow-right"></i></span>
+      </div>
+    </a>
+
     <a href="reader.html?file=live-comments" class="note-card">
       <div class="note-icon" style="background:rgba(248,81,73,0.12); color:#f85149"><i class="fas fa-comments"></i></div>
       <h3>Live Comments</h3>
@@ -300,7 +466,105 @@
       </div>
     </a>
 
-  </div>
+          </div>
+        </div>
+      </details>
+    </div>
+  </details>
+
+  <details class="notes-section" id="lld" open>
+    <summary>
+      <div class="section-heading">
+        <div class="section-icon" style="background:rgba(163,113,247,0.12);color:var(--purple)"><i class="fas fa-cubes"></i></div>
+        <div>
+          <h2>Low-Level Design (LLD)</h2>
+          <p>Classes, interfaces, object relationships, design principles, patterns, and implementation-focused examples.</p>
+        </div>
+      </div>
+    </summary>
+
+    <div class="notes-group">
+      <details open>
+        <summary>
+          <div class="group-title">
+            <i class="fas fa-book-open"></i> Concepts
+            <span class="group-toggle" aria-hidden="true"><i class="fas fa-chevron-up"></i></span>
+          </div>
+        </summary>
+        <div class="group-body">
+          <div class="notes-grid">
+        <a href="reader.html?file=lld-fundamentals" class="note-card">
+          <div class="note-icon" style="background:rgba(163,113,247,0.12);color:var(--purple)"><i class="fas fa-shapes"></i></div>
+          <h3>LLD Fundamentals</h3>
+          <p>OOP building blocks, SOLID principles, composition, UML relationships, extensibility, and a repeatable interview approach.</p>
+          <div class="note-footer">
+            <span class="note-tag" style="background:rgba(163,113,247,0.12);color:var(--purple)">Concepts</span>
+            <span class="note-arrow"><i class="fas fa-arrow-right"></i></span>
+          </div>
+        </a>
+
+        <a href="reader.html?file=design-patterns" class="note-card">
+          <div class="note-icon" style="background:rgba(63,185,80,0.12);color:var(--green)"><i class="fas fa-puzzle-piece"></i></div>
+          <h3>Design Patterns</h3>
+          <p>Creational, structural, and behavioral patterns with selection guidance and compact implementation examples.</p>
+          <div class="note-footer">
+            <span class="note-tag" style="background:rgba(63,185,80,0.12);color:var(--green)">Patterns</span>
+            <span class="note-arrow"><i class="fas fa-arrow-right"></i></span>
+          </div>
+        </a>
+          </div>
+        </div>
+      </details>
+    </div>
+
+    <div class="notes-group">
+      <details open>
+        <summary>
+          <div class="group-title">
+            <i class="fas fa-code"></i> Examples
+            <span class="group-toggle" aria-hidden="true"><i class="fas fa-chevron-up"></i></span>
+          </div>
+        </summary>
+        <div class="group-body">
+          <div class="notes-grid">
+        <a href="reader.html?file=parking-lot-lld" class="note-card">
+          <div class="note-icon" style="background:rgba(240,136,62,0.12);color:var(--orange)"><i class="fas fa-square-parking"></i></div>
+          <h3>Parking Lot</h3>
+          <p>Vehicle and spot abstractions, allocation strategy, tickets, pricing, payment, and extension points.</p>
+          <div class="note-footer">
+            <span class="note-tag" style="background:rgba(240,136,62,0.12);color:var(--orange)">LLD Example</span>
+            <span class="note-arrow"><i class="fas fa-arrow-right"></i></span>
+          </div>
+        </a>
+
+        <a href="reader.html?file=elevator-lld" class="note-card">
+          <div class="note-icon" style="background:rgba(88,166,255,0.12);color:var(--accent)"><i class="fas fa-elevator"></i></div>
+          <h3>Elevator System</h3>
+          <p>Request scheduling, elevator state, direction-aware dispatching, door safety, and concurrent event handling.</p>
+          <div class="note-footer">
+            <span class="note-tag" style="background:rgba(88,166,255,0.12);color:var(--accent)">LLD Example</span>
+            <span class="note-arrow"><i class="fas fa-arrow-right"></i></span>
+          </div>
+        </a>
+          </div>
+        </div>
+      </details>
+    </div>
+  </details>
 </div>
+
+<script>
+  const syncOpenSection = () => {
+    const hash = window.location.hash.replace('#', '');
+    if (!hash) return;
+    const target = document.getElementById(hash);
+    if (target && target.tagName === 'DETAILS') {
+      target.open = true;
+    }
+  };
+
+  window.addEventListener('load', syncOpenSection);
+  window.addEventListener('hashchange', syncOpenSection);
+</script>
 </body>
 </html>
