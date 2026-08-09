@@ -84,3 +84,13 @@ class RideRequestBuilder:
 **Cons**
 - Extra boilerplate.
 - More code than simple constructors.
+
+## Interview Check
+
+> **True or False:** "Builder is better than Factory for all cases of object construction."
+
+**Answer: False.**
+
+Builder is great when you have many optional fields and want a readable fluent interface. Factory is better when you want to polymorphically choose *which* class to instantiate. Use the right tool for the job:
+- **Builder:** Complex objects with optional fields / readable construction.
+- **Factory:** Deciding which implementation class to instantiate.

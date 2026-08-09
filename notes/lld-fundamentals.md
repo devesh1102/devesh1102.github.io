@@ -1,113 +1,68 @@
-# Low-Level Design Fundamentals
+# LLD Interview Framework
 
-Low-Level Design (LLD) converts requirements into classes, interfaces, methods, and object relationships that are easy to understand, test, and extend.
+Use this as your **thinking structure during interviews**.
 
-## HLD vs LLD
+---
 
-| Area | HLD | LLD |
-|---|---|---|
-| Focus | Services, databases, queues, and data flow | Classes, interfaces, methods, and object collaboration |
-| Primary concern | Scale, availability, and architecture | Maintainability, extensibility, and correctness |
-| Typical output | Architecture and sequence diagrams | Class diagrams, APIs, and interaction flows |
-| Common trade-off | Consistency vs availability | Simplicity vs flexibility |
+## Phase 1: Clarify Requirements (4-5 min)
+**Goal:** avoid designing the wrong thing.
 
-## A Repeatable LLD Process
+- Ask for core operations (create/update/delete/search/etc.).
+- Confirm rules and constraints (limits, validations, error behavior).
+- Define in-scope vs out-of-scope explicitly.
 
-1. Clarify the functional requirements and constraints.
-2. Identify the core entities and their responsibilities.
-3. Define relationships and lifecycle ownership.
-4. Model important states and state transitions.
-5. Introduce interfaces where behavior can vary.
-6. Walk through the main use cases with sequence flows.
-7. Check edge cases, concurrency, errors, and testability.
+**Say:** "Before I design classes, let me confirm requirements and boundaries."
 
-Avoid creating classes directly from every noun. A class should own meaningful state or behavior.
+---
 
-## OOP Building Blocks
+## Phase 2: Identify Core Entities (3-4 min)
+**Goal:** convert requirements into domain objects.
 
-### Encapsulation
+- List key nouns (User, Order, Slot, Payment...).
+- Decide ownership: who owns state and lifecycle?
+- Sketch relations quickly (association/composition).
 
-Keep an object's state private and expose operations that preserve its invariants. For example, an `Order` should expose `cancel()` rather than allowing callers to set its status directly.
+**Say:** "I will model entities around ownership of state and behavior."
 
-### Abstraction
+---
 
-Expose what a component does while hiding how it does it. A `PaymentProcessor` interface lets the checkout flow work without knowing Stripe- or bank-specific details.
+## Phase 3: Define Class Contracts (8-10 min)
+**Goal:** design clean APIs before coding.
 
-### Inheritance
+- For each class: state, methods, invariants.
+- Keep behavior close to data that owns it.
+- Use interfaces only where variation is expected.
 
-Use inheritance only for a genuine **is-a** relationship with stable shared behavior. Deep inheritance trees make change risky.
+**Say:** "I'll expose intent-based methods, not raw data manipulation."
 
-### Polymorphism
+---
 
-Different implementations can satisfy the same contract:
+## Phase 4: Walk Through Happy Path + Edge Cases (8-10 min)
+**Goal:** prove design correctness.
 
-```python
-from abc import ABC, abstractmethod
+- Run one concrete scenario end-to-end.
+- Then check 2-3 critical edge cases.
+- Highlight where validation and state transitions happen.
 
-class PricingStrategy(ABC):
-    @abstractmethod
-    def calculate(self, ticket):
-        pass
+**Say:** "I'll validate with one normal flow and then edge conditions."
 
-class HourlyPricing(PricingStrategy):
-    def calculate(self, ticket):
-        return Money.of_hours(ticket.duration)
-```
+---
 
-### Composition
+## Phase 5: Extensibility and Trade-offs (3-5 min)
+**Goal:** show senior-level design thinking.
 
-Prefer assembling behavior from small collaborators. A `CheckoutService` can compose inventory, payment, and notification interfaces instead of inheriting from them.
+- Explain where change is expected and why.
+- Show one extension ("What if we add X?") with minimal impact.
+- Mention trade-offs: simplicity vs flexibility, coupling vs abstraction.
 
-## SOLID Principles
+**Say:** "This design optimizes for current scope while keeping extension points here."
 
-| Principle | Practical meaning |
-|---|---|
-| Single Responsibility | A class should have one reason to change |
-| Open/Closed | Add new behavior through extension instead of editing stable code |
-| Liskov Substitution | Implementations must preserve the promises of their base contract |
-| Interface Segregation | Prefer small, focused interfaces over large general-purpose ones |
-| Dependency Inversion | Depend on abstractions at boundaries where implementations vary |
+---
 
-SOLID is guidance, not a target class count. Apply it where it reduces coupling and makes expected changes safer.
+## 30-Second LLD Interview Checklist
 
-## UML Relationships
-
-- **Association:** one object uses or knows another.
-- **Aggregation:** a weak whole-part relationship; the part can exist independently.
-- **Composition:** the whole owns the part's lifecycle.
-- **Dependency:** an object temporarily uses another object.
-- **Inheritance:** a subtype specializes a parent type.
-- **Realization:** a class implements an interface.
-
-## Model State Explicitly
-
-If behavior depends heavily on status, model valid transitions instead of scattering conditionals:
-
-```text
-CREATED -> CONFIRMED -> IN_PROGRESS -> COMPLETED
-    |           |
-    +--------> CANCELLED
-```
-
-Reject invalid transitions at the domain boundary. This keeps invariants close to the object that owns them.
-
-## Design for Change
-
-Introduce an abstraction when at least one of these is true:
-
-- Multiple implementations already exist.
-- A variation is an explicit requirement.
-- The dependency crosses an external boundary.
-- Isolating it significantly improves testing.
-
-Do not add factories, interfaces, or patterns only because they may be useful someday.
-
-## Interview Checklist
-
-- Are responsibilities clearly assigned?
-- Are important invariants protected?
-- Can expected variations be added without large rewrites?
-- Are invalid states and transitions prevented?
-- Are concurrency-sensitive operations identified?
-- Can core logic be tested without external systems?
-- Can you explain why each pattern or abstraction exists?
+1. Did I confirm requirements and boundaries?
+2. Are responsibilities clearly split across classes?
+3. Are invariants enforced by the right class?
+4. Did I validate with a scenario and edge cases?
+5. Can I explain one extension without redesigning everything?

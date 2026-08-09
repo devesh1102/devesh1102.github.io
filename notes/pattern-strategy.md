@@ -1,5 +1,7 @@
 # Strategy Pattern (Interview Focus)
 
+> **60-sec revision:** Use when you're replacing if/else logic with interchangeable behaviors. Define one interface, put each behavior in a separate implementation, and select the required implementation at runtime.
+
 ## 1) What problem this solves
 When behavior can change (pricing, ranking, allocation), big if/else chains become hard to maintain.  
 Strategy moves each behavior into a separate class so we can swap behavior cleanly.
@@ -62,3 +64,53 @@ class SurgePricing(PricingStrategy):
 **Cons**
 - More classes/indirection.
 - Slightly higher conceptual overhead for small cases.
+
+## Strategy vs Factory (common trap question)
+
+> **Myth:** "Factory is used to swap behavior at runtime after objects already exist."
+> **False.** That is **Strategy**. Factory only decides *which object gets instantiated* — it makes that call **once**, at creation time.
+
+**Factory is about creation. Strategy is about behavior.**
+
+| | Strategy | Factory |
+|---|---|---|
+| Question it answers | "Which behavior should I **run**?" | "Which object should I **create**?" |
+| When it decides | **After** the object exists | At **instantiation** |
+| Category | Behavioral | Creational |
+| Swappable later? | Yes — inject a different strategy anytime | No — the type is fixed once built |
+| Output | An executed behavior | An instance |
+
+### Side by side
+
+```python
+# STRATEGY: object exists; behavior is swapped afterwards.
+checkout = CheckoutService(RegularPricing())
+checkout.pricing = SurgePricing(1.8)   # same object, new behavior
+checkout.total(500)
+
+# FACTORY: decides WHICH object to build, once.
+sender = NotificationFactory.create(Channel.SMS)   # decision happens here
+sender.send("U-101", "Hi")                          # type is now fixed
+```
+
+### They compose well
+A factory often **creates the strategy** you then plug in:
+
+```python
+strategy = PricingFactory.create(hour_of_day)   # Factory: which strategy object
+checkout = CheckoutService(strategy)            # Strategy: how pricing behaves
+```
+
+**Say this in an interview:** "Factory picks the implementation at construction time; Strategy lets me change behavior after construction. I use Factory to build the Strategy."
+
+## Interview Check
+
+> **True or False:** "Strategy and Factory do the same thing — they both choose an implementation via polymorphism."
+
+**Answer: False (they compose, not duplicate).**
+
+Both use polymorphism, but they answer different questions:
+- **Factory:** "Which object should I instantiate?" (decision at *construction*)
+- **Strategy:** "Which behavior should I run?" (decision *after* object exists, swappable)
+
+They often work together: a factory creates the strategy you inject. But they solve different problems.

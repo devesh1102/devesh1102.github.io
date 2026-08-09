@@ -14,6 +14,65 @@ Design an elevator system that accepts hall and car requests, selects an elevato
 
 ## Core Model
 
+### Class Diagram
+
+```mermaid
+classDiagram
+    class ElevatorSystem {
+        -controllers
+        +requestHall(floor, direction) void
+    }
+    class ElevatorController {
+        +assign(request) void
+        +step() void
+    }
+    class ElevatorCar {
+        -id: str
+        -currentFloor: int
+        -direction: Direction
+        -state: ElevatorState
+        +addStop(floor) void
+        +step() void
+    }
+    class Door {
+        -state: DoorState
+        +open() void
+        +close() void
+        +isClosed() bool
+    }
+    class RequestQueue {
+        -upStops: SortedSet
+        -downStops: SortedSet
+        +add(floor) void
+        +next() int
+    }
+    class DispatchStrategy {
+        <<interface>>
+        +select(request, elevators) ElevatorCar
+    }
+    class HallRequest {
+        -floor: int
+        -direction: Direction
+    }
+    class CarRequest {
+        -destinationFloor: int
+    }
+
+    ElevatorSystem "1" *-- "1..*" ElevatorController : owns
+    ElevatorController "1" *-- "1" ElevatorCar : owns
+    ElevatorCar "1" *-- "1" Door : owns
+    ElevatorCar "1" *-- "1" RequestQueue : owns
+    ElevatorSystem ..> DispatchStrategy : uses
+    ElevatorController ..> HallRequest : handles
+    ElevatorCar ..> CarRequest : handles
+    DispatchStrategy <|.. NearestCarStrategy
+    DispatchStrategy <|.. LowestCostStrategy
+```
+
+**Reading the arrows:** every part here is composition — a `Door` or `RequestQueue` has no meaning without its car. `DispatchStrategy` is a dashed dependency because the system only *uses* it, and swapping the strategy never changes elevator behavior.
+
+### Text summary
+
 ```text
 ElevatorSystem
   ├── ElevatorController
@@ -123,14 +182,41 @@ The Strategy pattern allows the scheduler to evolve without changing elevator be
 
 ## Movement State Machine
 
-```text
-IDLE
-  -> MOVING
-  -> STOPPED
-  -> DOOR OPENING
-  -> DOOR OPEN
-  -> DOOR CLOSING
-  -> MOVING or IDLE
+```mermaid
+stateDiagram-v2
+    [*] --> IDLE
+    IDLE --> MOVING : stop added
+    MOVING --> STOPPED : arrived at stop
+    STOPPED --> DOOR_OPENING : safe to open
+    DOOR_OPENING --> DOOR_OPEN : fully open
+    DOOR_OPEN --> DOOR_CLOSING : timer expires
+    DOOR_CLOSING --> DOOR_OPEN : obstruction detected
+    DOOR_CLOSING --> MOVING : more stops queued
+    DOOR_CLOSING --> IDLE : queue empty
+    MOVING --> EMERGENCY : safety event
+    IDLE --> MAINTENANCE : service mode
+    EMERGENCY --> IDLE : reset
+    MAINTENANCE --> IDLE : back in service
+```
+
+### Hall request sequence
+
+```mermaid
+sequenceDiagram
+    participant Panel as FloorPanel
+    participant Ctrl as ElevatorController
+    participant Disp as DispatchStrategy
+    participant Car as ElevatorCar
+    participant Door
+
+    Panel->>Ctrl: hallRequest(floor, UP)
+    Ctrl->>Disp: select(request, elevators)
+    Disp-->>Ctrl: car
+    Ctrl->>Car: addStop(floor)
+    Car->>Car: step() until arrival
+    Car->>Door: open()
+    Door-->>Car: OPEN
+    Car-->>Panel: arrived(car)
 ```
 
 Important invariants:

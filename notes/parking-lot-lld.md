@@ -13,6 +13,64 @@ Design a multi-floor parking lot that supports different vehicle and spot types,
 
 ## Core Model
 
+### Class Diagram
+
+```mermaid
+classDiagram
+    class ParkingLot {
+        -floors
+        +park(vehicle) ParkingTicket
+        +unpark(ticket) Payment
+    }
+    class ParkingFloor {
+        -floorNumber: int
+        +availableSpots() List
+    }
+    class ParkingSpot {
+        -id: str
+        -status: SpotStatus
+        +canFit(vehicle) bool
+        +occupy(vehicle) void
+        +release() void
+    }
+    class Vehicle {
+        -registrationNumber: str
+        -type: VehicleType
+    }
+    class ParkingTicket {
+        -entryTime: datetime
+        -status: TicketStatus
+        +close(exitTime) void
+    }
+    class SpotAllocationStrategy {
+        <<interface>>
+        +allocate(vehicle, floors) ParkingSpot
+    }
+    class PricingStrategy {
+        <<interface>>
+        +calculate(ticket) Money
+    }
+    class PaymentProcessor {
+        <<interface>>
+        +pay(amount) Payment
+    }
+
+    ParkingLot "1" *-- "1..*" ParkingFloor : owns
+    ParkingFloor "1" *-- "0..*" ParkingSpot : owns
+    ParkingSpot "1" o-- "0..1" Vehicle : holds
+    ParkingTicket "1" --> "1" ParkingSpot : references
+    ParkingTicket "1" --> "1" Vehicle : issued for
+    ParkingLot ..> SpotAllocationStrategy : uses
+    ParkingLot ..> PricingStrategy : uses
+    ParkingLot ..> PaymentProcessor : uses
+    SpotAllocationStrategy <|.. NearestSpotStrategy
+    PricingStrategy <|.. HourlyPricing
+```
+
+**Reading the arrows:** filled diamond = composition (delete the floor, its spots go too). Hollow diamond = aggregation (the vehicle outlives the spot). Dashed triangle = implements. Dashed arrow = uses.
+
+### Text summary
+
 ```text
 ParkingLot
   └── ParkingFloor
@@ -109,6 +167,24 @@ The Strategy pattern allows nearest, cheapest, accessible, or reservation-aware 
 
 ## Park Vehicle Flow
 
+```mermaid
+sequenceDiagram
+    participant Gate as EntryGate
+    participant Svc as ParkingService
+    participant Alloc as AllocationStrategy
+    participant Spot as ParkingSpot
+    participant Repo as TicketRepository
+
+    Gate->>Svc: park(vehicle)
+    Svc->>Alloc: allocate(vehicle, floors)
+    Alloc-->>Svc: spot
+    Svc->>Spot: occupy(vehicle)
+    Spot-->>Svc: ok
+    Svc->>Repo: save(ticket)
+    Repo-->>Svc: ticket
+    Svc-->>Gate: ticket
+```
+
 1. Entry gate reads the vehicle details.
 2. `ParkingService` asks the allocation strategy for a spot.
 3. The selected spot is reserved atomically.
@@ -128,6 +204,17 @@ def park(vehicle):
 ```
 
 ## Exit and Payment Flow
+
+### Ticket state diagram
+
+```mermaid
+stateDiagram-v2
+    [*] --> ACTIVE : issued at entry
+    ACTIVE --> PAID : payment succeeds
+    ACTIVE --> LOST : ticket reported lost
+    LOST --> PAID : lost-ticket fee paid
+    PAID --> [*] : spot released
+```
 
 1. Load and validate the active ticket.
 2. Calculate the fee through `PricingStrategy`.

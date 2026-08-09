@@ -50,3 +50,12 @@ class ConfigStore:
 **Cons**
 - Hidden coupling.
 - Harder testing and concurrency concerns if overused.
+
+## Interview Check
+
+> **True or False:** "Passing a shared object through constructors makes its dependencies more explicit and easier to test than accessing it through a Singleton."
+
+**Answer: True.**
+
+Passing dependencies through constructors makes them visible in the type signature and easy to swap out in tests. A Singleton hides the dependency behind a global access point, which couples code to it and makes isolation in tests harder. That's why most interview designs use dependency injection over Singleton.
+

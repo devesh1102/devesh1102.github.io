@@ -199,6 +199,31 @@ road_wheel.brake(5)
 - **Separation of concerns**: Interface separate from implementation
 - **Easy swapping**: Replace one wheel with another without changing bike code
 
+### Quick Comparison: Abstraction vs Encapsulation
+
+| Aspect | Abstraction | Encapsulation |
+|--------|------------|---------------|
+| **Focus** | WHAT (interface, behavior) | HOW (data, implementation) |
+| **Purpose** | Hide complexity | Hide internals & protect state |
+| **Mechanism** | Abstract classes/interfaces | Private variables + public methods |
+| **Example** | `BicycleWheel` interface (what a wheel does) | `BikeGearSystem.__current_sprocket` (how gears work) |
+| **Question** | "What operations are available?" | "Can I access internal state directly?" |
+| **Used with** | Polymorphism (multiple implementations) | Encapsulation (data protection) |
+
+**Simple Rule:**
+- **Abstraction** = Hide the complex HOW behind a simple WHAT
+- **Encapsulation** = Wrap data + methods, control access with private/public
+
+**Bike Example:**
+```
+Abstraction:    You see "spin()" and "brake()" methods
+                You don't care: what type of wheel, how bearings work
+
+Encapsulation:  Bike gear system wraps __current_sprocket (private)
+                You can only access via shift_up() and shift_down()
+                You can't directly access __current_sprocket
+```
+
 ---
 
 ## 3. Inheritance
@@ -683,6 +708,142 @@ class Bike:
 
 ---
 
+## 7. Law of Demeter (LoD) - "Tell, Don't Ask"
+
+### What It Is
+**A unit (method/class) should only talk to its immediate neighbors, not dig through nested objects.**
+
+- Only call methods on objects you directly own
+- Don't chain method calls across multiple levels (`obj.get_x().get_y().do_z()`)
+- Reduce coupling between objects
+- Also known as the "Principle of Least Knowledge"
+
+### Real-Life Example: Bike Maintenance
+**Bad (Violates LoD):** You dig into the bike to adjust gears yourself
+```
+me.bike.gears.derailleur.position = 5  # Digging into internals!
+```
+
+**Good (Follows LoD):** You ask the bike to adjust gears
+```
+me.bike.shift_to_gear(5)  # Tell bike what to do, don't dig into it
+```
+
+You don't know or care HOW the derailleur works—just tell the bike "shift to gear 5"!
+
+### Coding Example: Violating LoD (Bad)
+
+```python
+# BAD: "Train Wreck" - chaining multiple method calls
+class BikeRider:
+    def start_ride(self, bike):
+        # Violates LoD: Digging 3 levels deep
+        bike.gears.derailleur.move_chain(5)  # Know too much about bike internals!
+        bike.brakes.front_brake.rotor.check_temperature()  # Even worse!
+        bike.frame.seat.adjust_height(10)  # Tight coupling!
+
+# Problem: If bike internals change, this breaks
+# If derailleur is renamed or moved, FAIL
+# Tightly coupled to bike's entire structure
+```
+
+### Coding Example: Following LoD (Good)
+
+```python
+# GOOD: Only talk to immediate neighbors
+class BikeRider:
+    def start_ride(self, bike):
+        # Just tell bike what you want, don't ask HOW
+        bike.shift_to_gear(5)           # Tell, don't ask
+        bike.check_brake_temperature()  # Ask bike, not internal parts
+        bike.adjust_seat_height(10)     # Tell, don't ask
+
+# Bike class handles all internal details
+class Bike:
+    def shift_to_gear(self, gear_number):
+        # YOU handle the derailleur internally
+        self.gears.shift(gear_number)   # Bike only talks to its parts
+    
+    def check_brake_temperature(self):
+        # YOU check the rotor, rider doesn't dig into it
+        return self.brakes.get_temperature()
+    
+    def adjust_seat_height(self, height):
+        # YOU adjust the frame, rider doesn't touch frame directly
+        self.frame.set_seat_height(height)
+
+# Benefit: Rider only knows public interface (shift_to_gear, check_brake_temperature)
+# Implementation details hidden completely
+```
+
+### Real-World Problems: LoD Violations
+
+| Violation | Problem | Cost |
+|-----------|---------|------|
+| `user.profile.settings.notifications.email` | 4 levels deep | Any refactoring breaks code |
+| `order.customer.address.country.code` | Tight coupling | Can't change Customer structure |
+| `request.user.account.permissions.admin` | Multiple dependencies | Hard to test, lots of mocks needed |
+
+### Three Rules of Law of Demeter
+
+**A method can call:**
+1. ✅ Methods on `self` (its own class)
+2. ✅ Methods on parameters passed to it
+3. ✅ Methods on objects it creates
+4. ✅ Methods on instance variables (but only directly)
+
+**A method should NOT:**
+1. ❌ Call methods on objects returned from other methods (chaining)
+2. ❌ Access nested object properties
+3. ❌ Assume knowledge of object structure
+
+### Bad vs Good: Side-by-Side Comparison
+
+**Bad: Violates LoD (Tight Coupling)**
+```python
+def process_payment(order):
+    # BAD: Digging 3 levels
+    amount = order.customer.wallet.balance
+    order.customer.wallet.deduct(amount)
+    order.customer.account.record_transaction(amount)
+```
+
+**Good: Follows LoD (Loose Coupling)**
+```python
+def process_payment(order):
+    # GOOD: Tell order to handle payment
+    order.process_payment()
+
+# Order delegates to its parts
+class Order:
+    def process_payment(self):
+        amount = self.customer.get_payment_method().charge(amount)
+        self.customer.record_payment(amount)
+```
+
+### Benefits of LoD
+- **Loose Coupling**: Objects don't depend on internal structure of other objects
+- **Easy Refactoring**: Change bike internals without breaking rider code
+- **Testability**: Easier to mock objects with simple interfaces
+- **Maintainability**: Changes localized to one class
+- **Encapsulation**: Real hiding of implementation details
+
+### When LoD Saves You
+
+```python
+# BEFORE: Violates LoD (brittle)
+bike_shop.inventory.bikes[0].brakes.front.rotor.diameter = 200
+
+# AFTER: 2-month project later, inventory structure changes
+# CRASH! Code breaks everywhere 💥
+
+# SOLUTION: Follow LoD from start
+bike_shop.update_bike_brake_rotor(bike_id=0, diameter=200)
+# Only BikeShop knows its structure - change it = no external breakage
+```
+
+---
+
 ## Interview Cheat Sheet
 
 ### Encapsulation
@@ -710,9 +871,16 @@ class Bike:
 - **A**: When you have "HAS-A" relationships (Bike HAS-A Wheel, not Bike IS-A Wheel)
 - **Example**: Bike class composed of Wheel, Frame, Brake, GearSystem
 
+### Law of Demeter (LoD)
+- **Q**: How do you reduce coupling between objects?
+- **A**: Only talk to immediate neighbors, don't chain method calls
+- **Rule**: `bike.shift_to_gear(5)` ✓ vs `bike.gears.derailleur.move(5)` ✗
+- **Example**: BikeRider tells Bike what to do, not how to do it
+
 ### Which to Use?
 - **Need to hide state?** → Encapsulation
 - **Complex implementation?** → Abstraction
 - **Share common behavior?** → Inheritance (IS-A)
 - **Different behaviors, same interface?** → Polymorphism
 - **Build from parts?** → Composition (HAS-A)
+- **Too many nested calls?** → Law of Demeter (LoD)
