@@ -21,106 +21,88 @@
 ### What It Is
 **A class should have only ONE reason to change.**
 
-- One class = one responsibility = one reason to change
+- One class = one responsibility
 - If a class handles multiple concerns, split it into multiple classes
 - Makes code easier to test, maintain, and understand
 
 ### Problem (Violates SRP)
 
-```java
-// BAD: One class doing too much
-public class User {
-    private String name;
-    private String email;
+```python
+# BAD: One class doing too much
+class User:
+    def __init__(self, name, email):
+        self.name = name
+        self.email = email
+    
+    def save_to_database(self):
+        # Responsibility 1: persistence
+        print(f"Saving user {self.name} to database")
+    
+    def send_email(self):
+        # Responsibility 2: notifications
+        print(f"Sending welcome email to {self.email}")
+    
+    def generate_report(self):
+        # Responsibility 3: reporting
+        print(f"Generating report for {self.name}")
 
-    public void saveToDatabase() {  // Responsibility 1: persistence
-        // Database logic
-    }
-
-    public void sendEmail() {  // Responsibility 2: notifications
-        // Email logic
-    }
-
-    public void generateReport() {  // Responsibility 3: reporting
-        // Report generation logic
-    }
-}
-
-// Problem: This class has 3 reasons to change:
-// 1. Database schema changes
-// 2. Email service changes
-// 3. Report format changes
+# Problem: This class has 3 reasons to change:
+# 1. Database schema changes
+# 2. Email service changes
+# 3. Report format changes
 ```
 
 ### Solution (Follows SRP)
 
-```java
-// Responsibility 1: User data
-public class User {
-    private String name;
-    private String email;
+```python
+# Responsibility 1: User data
+class User:
+    def __init__(self, name, email):
+        self.name = name
+        self.email = email
 
-    public String getName() { return name; }
-    public String getEmail() { return email; }
-}
-
-// Responsibility 2: Persistence
-public class UserRepository {
-    public void save(User user) {
-        // Database logic
-        System.out.println("User saved to database");
-    }
-
-    public User findByEmail(String email) {
-        // Database query
-        return null;
-    }
-}
-
-// Responsibility 3: Notifications
-public class EmailService {
-    public void sendWelcomeEmail(User user) {
-        // Email logic
-        System.out.println("Welcome email sent to " + user.getEmail());
-    }
-}
-
-// Responsibility 4: Reporting
-public class UserReporter {
-    public void generateUserReport(User user) {
-        // Report logic
-        System.out.println("Report generated for " + user.getName());
-    }
-}
-
-// Usage:
-public static void main(String[] args) {
-    User user = new User("John", "john@example.com");
+# Responsibility 2: Persistence
+class UserRepository:
+    def save(self, user):
+        print(f"User {user.name} saved to database")
     
-    UserRepository repo = new UserRepository();
-    repo.save(user);  // Only saves
-    
-    EmailService email = new EmailService();
-    email.sendWelcomeEmail(user);  // Only emails
-    
-    UserReporter reporter = new UserReporter();
-    reporter.generateUserReport(user);  // Only reports
-}
+    def find_by_email(self, email):
+        return None  # Database query
+
+# Responsibility 3: Notifications
+class EmailService:
+    def send_welcome_email(self, user):
+        print(f"Welcome email sent to {user.email}")
+
+# Responsibility 4: Reporting
+class UserReporter:
+    def generate_user_report(self, user):
+        print(f"Report generated for {user.name}")
+
+# Usage:
+user = User("John", "john@example.com")
+
+repo = UserRepository()
+repo.save(user)
+
+email = EmailService()
+email.send_welcome_email(user)
+
+reporter = UserReporter()
+reporter.generate_user_report(user)
 ```
 
 ### Benefits
 - **Maintainability**: Changes to email logic don't affect database code
-- **Testability**: Easy to mock/test each responsibility independently
+- **Testability**: Easy to test each responsibility independently
 - **Reusability**: Each class can be used independently
 - **Clarity**: Class name clearly describes what it does
 
 ### Real-World Example
 A **restaurant** doesn't have one person doing cooking, serving, and accounting. It has:
 - Chef (cooking responsibility)
-- Waiter (serving responsibility)
+- Waiter (serving responsibility)  
 - Accountant (accounting responsibility)
-
-Each person has ONE responsibility.
 
 ---
 
@@ -135,102 +117,83 @@ Each person has ONE responsibility.
 
 ### Problem (Violates OCP)
 
-```java
-// BAD: Modifying class for every new shape
-public class AreaCalculator {
-    public double calculateArea(Object shape) {
-        if (shape instanceof Rectangle) {
-            Rectangle r = (Rectangle) shape;
-            return r.getLength() * r.getWidth();
-        } else if (shape instanceof Circle) {
-            Circle c = (Circle) shape;
-            return Math.PI * c.getRadius() * c.getRadius();
-        } else if (shape instanceof Triangle) {  // Adding new type requires modification
-            Triangle t = (Triangle) shape;
-            return 0.5 * t.getBase() * t.getHeight();
-        }
-        return 0;
-    }
-}
+```python
+# BAD: Modifying class for every new shape
+class AreaCalculator:
+    def calculate_area(self, shape):
+        if shape.__class__.__name__ == "Rectangle":
+            return shape.length * shape.width
+        elif shape.__class__.__name__ == "Circle":
+            return 3.14159 * shape.radius * shape.radius
+        elif shape.__class__.__name__ == "Triangle":  # Adding new type requires modification
+            return 0.5 * shape.base * shape.height
+        return 0
 
-// Problem: Every new shape requires modifying AreaCalculator
-// Changes risk breaking existing code
+# Problem: Every new shape requires modifying AreaCalculator
+# Changes risk breaking existing code
 ```
 
 ### Solution (Follows OCP)
 
-```java
-// Open for extension: define interface
-public interface Shape {
-    double calculateArea();
-}
+```python
+from abc import ABC, abstractmethod
+import math
 
-// Closed for modification: implement interface for each shape
-public class Rectangle implements Shape {
-    private double length;
-    private double width;
+# Open for extension: define abstract class
+class Shape(ABC):
+    @abstractmethod
+    def calculate_area(self):
+        pass
 
-    public Rectangle(double length, double width) {
-        this.length = length;
-        this.width = width;
-    }
+# Closed for modification: implement interface for each shape
+class Rectangle(Shape):
+    def __init__(self, length, width):
+        self.length = length
+        self.width = width
+    
+    def calculate_area(self):
+        return self.length * self.width
 
-    @Override
-    public double calculateArea() {
-        return length * width;
-    }
-}
+class Circle(Shape):
+    def __init__(self, radius):
+        self.radius = radius
+    
+    def calculate_area(self):
+        return math.pi * self.radius * self.radius
 
-public class Circle implements Shape {
-    private double radius;
+class Triangle(Shape):
+    def __init__(self, base, height):
+        self.base = base
+        self.height = height
+    
+    def calculate_area(self):
+        return 0.5 * self.base * self.height
 
-    public Circle(double radius) {
-        this.radius = radius;
-    }
+# Add NEW shape without modifying AreaCalculator
+class Hexagon(Shape):
+    def __init__(self, side):
+        self.side = side
+    
+    def calculate_area(self):
+        return (3 * math.sqrt(3) / 2) * self.side * self.side
 
-    @Override
-    public double calculateArea() {
-        return Math.PI * radius * radius;
-    }
-}
+# Calculator: closed for modification, open for extension
+class AreaCalculator:
+    def calculate_area(self, shape):
+        return shape.calculate_area()  # Polymorphic call
+    
+    def calculate_total_area(self, shapes):
+        return sum(shape.calculate_area() for shape in shapes)
 
-// Add NEW shape without modifying AreaCalculator
-public class Hexagon implements Shape {
-    private double side;
+# Usage:
+shapes = [
+    Rectangle(5, 10),
+    Circle(7),
+    Hexagon(3)  # New shape, NO changes to AreaCalculator!
+]
 
-    public Hexagon(double side) {
-        this.side = side;
-    }
-
-    @Override
-    public double calculateArea() {
-        return (3 * Math.sqrt(3) / 2) * side * side;
-    }
-}
-
-// Calculator: closed for modification, open for extension
-public class AreaCalculator {
-    public double calculateArea(Shape shape) {
-        return shape.calculateArea();  // Polymorphic call
-    }
-
-    public double calculateTotalArea(List<Shape> shapes) {
-        return shapes.stream()
-                .mapToDouble(Shape::calculateArea)
-                .sum();
-    }
-}
-
-// Usage:
-public static void main(String[] args) {
-    List<Shape> shapes = new ArrayList<>();
-    shapes.add(new Rectangle(5, 10));
-    shapes.add(new Circle(7));
-    shapes.add(new Hexagon(3));  // New shape, NO changes to AreaCalculator!
-
-    AreaCalculator calculator = new AreaCalculator();
-    System.out.println("Total Area: " + calculator.calculateTotalArea(shapes));
-}
+calculator = AreaCalculator()
+print(f"Total Area: {calculator.calculate_total_area(shapes)}")
 ```
 
 ### Benefits
@@ -240,7 +203,7 @@ public static void main(String[] args) {
 - **Testability**: Test each implementation independently
 
 ### Real-World Example
-A **payment system** is open for extension (add PayPal, Apple Pay, cryptocurrency) but closed for modification. You don't change the core payment processor; you add new payment method implementations.
+A **payment system** is open for extension (add PayPal, Apple Pay, crypto) but closed for modification. You don't change the core processor; you add new implementations.
 
 ---
 
@@ -255,110 +218,90 @@ A **payment system** is open for extension (add PayPal, Apple Pay, cryptocurrenc
 
 ### Problem (Violates LSP)
 
-```java
-// Base class contract
-public class Bird {
-    public void fly() {
-        System.out.println("Flying...");
-    }
-}
+```python
+# Base class contract
+class Bird:
+    def fly(self):
+        print("Flying...")
 
-public class Sparrow extends Bird {
-    // Follows contract: can fly
-    @Override
-    public void fly() {
-        System.out.println("Sparrow flying");
-    }
-}
+class Sparrow(Bird):
+    def fly(self):
+        print("Sparrow flying")  # Follows contract
 
-// Problem: Penguin is a bird but CAN'T fly
-public class Penguin extends Bird {
-    @Override
-    public void fly() {
-        throw new UnsupportedOperationException("Penguins can't fly");  // Breaks contract!
-    }
-}
+# Problem: Penguin is a bird but CAN'T fly
+class Penguin(Bird):
+    def fly(self):
+        raise Exception("Penguins can't fly")  # Breaks contract!
 
-// Usage breaks:
-public static void letBirdFly(Bird bird) {
-    bird.fly();  // Works for Sparrow, throws exception for Penguin
-}
+# Usage breaks:
+def let_bird_fly(bird):
+    bird.fly()  # Works for Sparrow, throws exception for Penguin
 
-public static void main(String[] args) {
-    Bird sparrow = new Sparrow();
-    letBirdFly(sparrow);  // ✓ Works
-    
-    Bird penguin = new Penguin();
-    letBirdFly(penguin);  // ✗ Throws exception!
-}
+# Code:
+sparrow = Sparrow()
+let_bird_fly(sparrow)  # ✓ Works
+
+penguin = Penguin()
+let_bird_fly(penguin)  # ✗ Throws exception!
 ```
 
 ### Solution (Follows LSP)
 
-```java
-// Base interface: only for birds that can fly
-public interface FlyingBird {
-    void fly();
-}
+```python
+from abc import ABC, abstractmethod
 
-// Base interface: for all birds
-public interface Bird {
-    void eat();
-    void sleep();
-}
-
-// Sparrow: implements both (can fly and eat/sleep)
-public class Sparrow implements FlyingBird, Bird {
-    @Override
-    public void fly() {
-        System.out.println("Sparrow flying");
-    }
-
-    @Override
-    public void eat() {
-        System.out.println("Sparrow eating");
-    }
-
-    @Override
-    public void sleep() {
-        System.out.println("Sparrow sleeping");
-    }
-}
-
-// Penguin: implements only Bird (can eat/sleep, but NOT fly)
-public class Penguin implements Bird {
-    @Override
-    public void eat() {
-        System.out.println("Penguin eating");
-    }
-
-    @Override
-    public void sleep() {
-        System.out.println("Penguin sleeping");
-    }
-
-    public void swim() {  // Penguins swim instead of fly
-        System.out.println("Penguin swimming");
-    }
-}
-
-// Usage: no surprises
-public static void letBirdFly(FlyingBird bird) {
-    bird.fly();  // Only called with birds that CAN fly
-}
-
-public static void feedBird(Bird bird) {
-    bird.eat();  // Works for Sparrow and Penguin
-}
-
-public static void main(String[] args) {
-    FlyingBird sparrow = new Sparrow();
-    letBirdFly(sparrow);  // ✓ Works
+# Base interface: for all birds
+class Bird(ABC):
+    @abstractmethod
+    def eat(self):
+        pass
     
-    Bird penguin = new Penguin();
-    feedBird(penguin);  // ✓ Works
-    // letBirdFly(penguin);  // Won't compile; penguin doesn't implement FlyingBird
-}
+    @abstractmethod
+    def sleep(self):
+        pass
+
+# Specialized interface: only for birds that can fly
+class FlyingBird(Bird):
+    @abstractmethod
+    def fly(self):
+        pass
+
+# Sparrow: can fly and eat/sleep
+class Sparrow(FlyingBird):
+    def fly(self):
+        print("Sparrow flying")
+    
+    def eat(self):
+        print("Sparrow eating")
+    
+    def sleep(self):
+        print("Sparrow sleeping")
+
+# Penguin: can eat/sleep, but NOT fly
+class Penguin(Bird):
+    def eat(self):
+        print("Penguin eating")
+    
+    def sleep(self):
+        print("Penguin sleeping")
+    
+    def swim(self):  # Penguins swim instead of fly
+        print("Penguin swimming")
+
+# Usage: no surprises
+def let_bird_fly(bird):
+    bird.fly()  # Only called with birds that CAN fly
+
+def feed_bird(bird):
+    bird.eat()  # Works for Sparrow and Penguin
+
+# Code:
+sparrow = Sparrow()
+let_bird_fly(sparrow)  # ✓ Works
+
+penguin = Penguin()
+feed_bird(penguin)      # ✓ Works
+# let_bird_fly(penguin) # Won't work; penguin doesn't implement FlyingBird
 ```
 
 ### Benefits
@@ -367,7 +310,7 @@ public static void main(String[] args) {
 - **Loose Coupling**: Can use any subtype without special checks
 
 ### Real-World Example
-A **payment processor** has many payment methods (Visa, MasterCard, PayPal). Each should handle payments consistently. If one throws an exception instead of processing, it violates the contract.
+A **payment processor** has many payment methods (Visa, MasterCard, PayPal). Each should handle payments consistently. If one throws an exception, it violates the contract.
 
 ---
 
@@ -382,126 +325,139 @@ A **payment processor** has many payment methods (Visa, MasterCard, PayPal). Eac
 
 ### Problem (Violates ISP)
 
-```java
-// BAD: One fat interface with too many responsibilities
-public interface Worker {
-    void work();
-    void eat();
-    void manage();
-    void code();
-    void design();
-}
+```python
+# BAD: One fat interface with too many responsibilities
+class Worker(ABC):
+    @abstractmethod
+    def work(self):
+        pass
+    
+    @abstractmethod
+    def eat(self):
+        pass
+    
+    @abstractmethod
+    def manage(self):
+        pass
+    
+    @abstractmethod
+    def code(self):
+        pass
+    
+    @abstractmethod
+    def design(self):
+        pass
 
-// Developer has to implement ALL methods, even ones not relevant
-public class Developer implements Worker {
-    @Override
-    public void work() { System.out.println("Coding"); }
+# Developer has to implement ALL methods
+class Developer(Worker):
+    def work(self):
+        print("Coding")
+    
+    def eat(self):
+        print("Eating")
+    
+    def manage(self):
+        raise NotImplementedError()  # Forced to implement
+    
+    def code(self):
+        print("Writing code")
+    
+    def design(self):
+        print("UI design")
 
-    @Override
-    public void eat() { System.out.println("Eating"); }
-
-    @Override
-    public void manage() { throw new UnsupportedOperationException(); }  // Forced to implement
-
-    @Override
-    public void code() { System.out.println("Writing code"); }
-
-    @Override
-    public void design() { System.out.println("UI design"); }
-}
-
-// Manager has to implement coding methods they don't use
-public class Manager implements Worker {
-    @Override
-    public void work() { System.out.println("Managing"); }
-
-    @Override
-    public void eat() { System.out.println("Eating"); }
-
-    @Override
-    public void manage() { System.out.println("Organizing team"); }
-
-    @Override
-    public void code() { throw new UnsupportedOperationException(); }  // Forced to implement
-
-    @Override
-    public void design() { throw new UnsupportedOperationException(); }  // Forced to implement
-}
+# Manager has to implement coding methods they don't use
+class Manager(Worker):
+    def work(self):
+        print("Managing")
+    
+    def eat(self):
+        print("Eating")
+    
+    def manage(self):
+        print("Organizing team")
+    
+    def code(self):
+        raise NotImplementedError()  # Forced to implement
+    
+    def design(self):
+        raise NotImplementedError()  # Forced to implement
 ```
 
 ### Solution (Follows ISP)
 
-```java
-// Segregate into focused interfaces
-public interface Workable {
-    void work();
-}
+```python
+from abc import ABC, abstractmethod
 
-public interface Eatable {
-    void eat();
-}
+# Segregate into focused interfaces
+class Workable(ABC):
+    @abstractmethod
+    def work(self):
+        pass
 
-public interface Manageable {
-    void manage();
-}
+class Eatable(ABC):
+    @abstractmethod
+    def eat(self):
+        pass
 
-public interface Codeable {
-    void code();
-}
+class Manageable(ABC):
+    @abstractmethod
+    def manage(self):
+        pass
 
-public interface Designable {
-    void design();
-}
+class Codeable(ABC):
+    @abstractmethod
+    def code(self):
+        pass
 
-// Developer: implements only relevant interfaces
-public class Developer implements Workable, Eatable, Codeable, Designable {
-    @Override
-    public void work() { System.out.println("Coding"); }
+class Designable(ABC):
+    @abstractmethod
+    def design(self):
+        pass
 
-    @Override
-    public void eat() { System.out.println("Eating"); }
-
-    @Override
-    public void code() { System.out.println("Writing code"); }
-
-    @Override
-    public void design() { System.out.println("UI design"); }
-}
-
-// Manager: implements only relevant interfaces
-public class Manager implements Workable, Eatable, Manageable {
-    @Override
-    public void work() { System.out.println("Managing"); }
-
-    @Override
-    public void eat() { System.out.println("Eating"); }
-
-    @Override
-    public void manage() { System.out.println("Organizing team"); }
-}
-
-// Robot: only workable, doesn't eat
-public class Robot implements Workable, Codeable {
-    @Override
-    public void work() { System.out.println("Processing"); }
-
-    @Override
-    public void code() { System.out.println("Executing code"); }
-}
-
-// Usage:
-public static void main(String[] args) {
-    Developer dev = new Developer();
-    dev.code();        // ✓ Relevant
-    dev.eat();         // ✓ Relevant
+# Developer: implements only relevant interfaces
+class Developer(Workable, Eatable, Codeable, Designable):
+    def work(self):
+        print("Coding")
     
-    Manager mgr = new Manager();
-    mgr.manage();      // ✓ Relevant
+    def eat(self):
+        print("Eating")
     
-    Robot robot = new Robot();
-    robot.code();      // ✓ Relevant
-    // robot.eat();    // ✓ Not required
-}
+    def code(self):
+        print("Writing code")
+    
+    def design(self):
+        print("UI design")
+
+# Manager: implements only relevant interfaces
+class Manager(Workable, Eatable, Manageable):
+    def work(self):
+        print("Managing")
+    
+    def eat(self):
+        print("Eating")
+    
+    def manage(self):
+        print("Organizing team")
+
+# Robot: only workable, doesn't eat
+class Robot(Workable, Codeable):
+    def work(self):
+        print("Processing")
+    
+    def code(self):
+        print("Executing code")
+
+# Usage:
+dev = Developer()
+dev.code()      # ✓ Relevant
+dev.eat()       # ✓ Relevant
+
+mgr = Manager()
+mgr.manage()    # ✓ Relevant
+
+robot = Robot()
+robot.code()    # ✓ Relevant
+# robot.eat()   # ✓ Not required
 ```
 
 ### Benefits
@@ -521,117 +477,91 @@ An **airline ticket interface** shouldn't force passengers to implement "pilot" 
 **High-level modules should depend on abstractions, not low-level details.**
 
 - Depend on interfaces/abstract classes, not concrete implementations
-- Invert the dependency direction: low-level classes depend on abstractions
+- Invert the dependency direction
 - Reduces coupling between components
 
 ### Problem (Violates DIP)
 
-```java
-// Low-level class: concrete implementation
-public class MySQLDatabase {
-    public void save(String data) {
-        System.out.println("Saving to MySQL: " + data);
-    }
-}
+```python
+# Low-level class: concrete implementation
+class MySQLDatabase:
+    def save(self, data):
+        print(f"Saving to MySQL: {data}")
 
-// High-level class: directly depends on MySQL
-public class UserService {
-    private MySQLDatabase database;  // Tightly coupled
+# High-level class: directly depends on MySQL
+class UserService:
+    def __init__(self):
+        self.database = MySQLDatabase()  # Tightly coupled
+    
+    def create_user(self, username):
+        self.database.save(username)
 
-    public UserService() {
-        this.database = new MySQLDatabase();  // Hard to test, hard to change
-    }
-
-    public void createUser(String username) {
-        database.save(username);
-    }
-}
-
-// Problem: Changing to PostgreSQL requires modifying UserService
-// Hard to test: can't mock database
+# Problem: Changing to PostgreSQL requires modifying UserService
+# Hard to test: can't mock database
 ```
 
 ### Solution (Follows DIP)
 
-```java
-// Abstraction: interface for any database
-public interface Database {
-    void save(String data);
-    String retrieve(String id);
-}
+```python
+from abc import ABC, abstractmethod
 
-// Low-level implementations depend on abstraction
-public class MySQLDatabase implements Database {
-    @Override
-    public void save(String data) {
-        System.out.println("Saving to MySQL: " + data);
-    }
-
-    @Override
-    public String retrieve(String id) {
-        return "Data from MySQL";
-    }
-}
-
-public class PostgreSQLDatabase implements Database {
-    @Override
-    public void save(String data) {
-        System.out.println("Saving to PostgreSQL: " + data);
-    }
-
-    @Override
-    public String retrieve(String id) {
-        return "Data from PostgreSQL";
-    }
-}
-
-// High-level class: depends on abstraction, not concrete class
-public class UserService {
-    private Database database;  // Depends on interface
-
-    // Dependency injection: database passed in
-    public UserService(Database database) {
-        this.database = database;
-    }
-
-    public void createUser(String username) {
-        database.save(username);  // Works with any database
-    }
-
-    public String getUser(String id) {
-        return database.retrieve(id);
-    }
-}
-
-// Usage:
-public static void main(String[] args) {
-    // Easy to swap implementations
-    Database mysql = new MySQLDatabase();
-    UserService service1 = new UserService(mysql);
-    service1.createUser("John");  // Saves to MySQL
+# Abstraction: interface for any database
+class Database(ABC):
+    @abstractmethod
+    def save(self, data):
+        pass
     
-    Database postgres = new PostgreSQLDatabase();
-    UserService service2 = new UserService(postgres);
-    service2.createUser("Jane");  // Saves to PostgreSQL
+    @abstractmethod
+    def retrieve(self, id):
+        pass
+
+# Low-level implementations depend on abstraction
+class MySQLDatabase(Database):
+    def save(self, data):
+        print(f"Saving to MySQL: {data}")
     
-    // For testing: use a mock
-    Database mockDb = new MockDatabase();
-    UserService testService = new UserService(mockDb);
-    testService.createUser("TestUser");
-}
+    def retrieve(self, id):
+        return "Data from MySQL"
 
-// Mock for testing
-public class MockDatabase implements Database {
-    @Override
-    public void save(String data) {
-        System.out.println("Mock: saving " + data);
-    }
+class PostgreSQLDatabase(Database):
+    def save(self, data):
+        print(f"Saving to PostgreSQL: {data}")
+    
+    def retrieve(self, id):
+        return "Data from PostgreSQL"
 
-    @Override
-    public String retrieve(String id) {
-        return "Mock data";
-    }
-}
+# High-level class: depends on abstraction, not concrete class
+class UserService:
+    def __init__(self, database):
+        self.database = database  # Depends on interface
+    
+    def create_user(self, username):
+        self.database.save(username)
+    
+    def get_user(self, id):
+        return self.database.retrieve(id)
+
+# Usage:
+# Easy to swap implementations
+mysql_db = MySQLDatabase()
+service1 = UserService(mysql_db)
+service1.create_user("John")  # Saves to MySQL
+
+postgres_db = PostgreSQLDatabase()
+service2 = UserService(postgres_db)
+service2.create_user("Jane")  # Saves to PostgreSQL
+
+# For testing: use a mock
+class MockDatabase(Database):
+    def save(self, data):
+        print(f"Mock: saving {data}")
+    
+    def retrieve(self, id):
+        return "Mock data"
+
+mock_db = MockDatabase()
+test_service = UserService(mock_db)
+test_service.create_user("TestUser")
 ```
 
 ### Benefits
@@ -641,7 +571,7 @@ public class MockDatabase implements Database {
 - **Scalability**: Add new implementations easily
 
 ### Real-World Example
-A **restaurant** depends on the concept of a "supplier" (abstraction), not a specific vendor. If one vendor goes out of business, you switch to another without changing restaurant operations.
+A **restaurant** depends on the concept of a "supplier" (abstraction), not a specific vendor. If one vendor fails, you switch to another without changing restaurant operations.
 
 ---
 
@@ -649,74 +579,74 @@ A **restaurant** depends on the concept of a "supplier" (abstraction), not a spe
 
 ### E-Commerce Order System Example
 
-```java
-// S: Single Responsibility
-public class Order {
-    private String id;
-    private List<Item> items;
-    // Order data only, no persistence/email/notification logic
-}
+```python
+from abc import ABC, abstractmethod
+from enum import Enum
 
-// I: Interface Segregation
-public interface OrderRepository {
-    void save(Order order);
-}
+# S: Single Responsibility
+class Order:
+    def __init__(self, id, items):
+        self.id = id
+        self.items = items
 
-public interface EmailService {
-    void sendConfirmation(Order order);
-}
+# I: Interface Segregation
+class OrderRepository(ABC):
+    @abstractmethod
+    def save(self, order):
+        pass
 
-public interface PaymentProcessor {
-    boolean processPayment(Order order);
-}
+class EmailService(ABC):
+    @abstractmethod
+    def send_confirmation(self, order):
+        pass
 
-// D: Dependency Inversion (high-level depends on abstractions)
-public class OrderService {
-    private OrderRepository repository;
-    private EmailService email;
-    private PaymentProcessor payment;
+class PaymentProcessor(ABC):
+    @abstractmethod
+    def process_payment(self, order):
+        pass
 
-    public OrderService(OrderRepository repo, EmailService email, PaymentProcessor payment) {
-        this.repository = repo;
-        this.email = email;
-        this.payment = payment;
-    }
+# D: Dependency Inversion (high-level depends on abstractions)
+class OrderService:
+    def __init__(self, repository, email_service, payment_processor):
+        self.repository = repository
+        self.email_service = email_service
+        self.payment_processor = payment_processor
+    
+    def create_order(self, order):
+        if self.payment_processor.process_payment(order):
+            self.repository.save(order)
+            self.email_service.send_confirmation(order)
+            print("Order created successfully")
+        else:
+            print("Payment failed")
 
-    public void createOrder(Order order) {
-        if (payment.processPayment(order)) {
-            repository.save(order);
-            email.sendConfirmation(order);
-        }
-    }
-}
+# O: Open/Closed (open for extension via new implementations)
+class StripePaymentProcessor(PaymentProcessor):
+    def process_payment(self, order):
+        print("Processing with Stripe")
+        return True
 
-// O: Open/Closed (open for extension via new implementations)
-public class StripePaymentProcessor implements PaymentProcessor {
-    @Override
-    public boolean processPayment(Order order) {
-        System.out.println("Processing with Stripe");
-        return true;
-    }
-}
+class PayPalPaymentProcessor(PaymentProcessor):
+    def process_payment(self, order):
+        print("Processing with PayPal")
+        return True
 
-public class PayPalPaymentProcessor implements PaymentProcessor {
-    @Override
-    public boolean processPayment(Order order) {
-        System.out.println("Processing with PayPal");
-        return true;
-    }
-}
+class SQLOrderRepository(OrderRepository):
+    def save(self, order):
+        print(f"Order {order.id} saved to SQL database")
 
-// L: Liskov Substitution (any PaymentProcessor works)
-public static void main(String[] args) {
-    OrderRepository repo = new MySQLOrderRepository();
-    EmailService emailService = new GmailEmailService();
-    PaymentProcessor payment = new StripePaymentProcessor();  // Can swap to PayPalPaymentProcessor
+class GmailEmailService(EmailService):
+    def send_confirmation(self, order):
+        print(f"Confirmation sent for order {order.id}")
 
-    OrderService orderService = new OrderService(repo, emailService, payment);
-    Order order = new Order("ORD123");
-    orderService.createOrder(order);
-}
+# L: Liskov Substitution (any PaymentProcessor works)
+order = Order(1, ["item1", "item2"])
+repo = SQLOrderRepository()
+email = GmailEmailService()
+payment = StripePaymentProcessor()  # Can swap to PayPalPaymentProcessor
+
+service = OrderService(repo, email, payment)
+service.create_order(order)
 ```
 
 ---
@@ -725,11 +655,11 @@ public static void main(String[] args) {
 
 | Principle | Problem | Solution | Benefit |
 |---|---|---|---|
-| **SRP** | Class has too many responsibilities | Split into single-responsibility classes | Easy to test, maintain, and change |
-| **OCP** | Modifying code for new features | Use inheritance/interfaces for extension | Add features without changing existing code |
-| **LSP** | Subtype breaks parent contract | Ensure subtypes maintain expected behavior | Subtypes work seamlessly with base type |
+| **SRP** | Too many responsibilities | Split into single-responsibility classes | Easy to test and maintain |
+| **OCP** | Modifying code for new features | Use inheritance/interfaces for extension | Add features without changing code |
+| **LSP** | Subtype breaks parent contract | Ensure subtypes maintain behavior | Subtypes work seamlessly |
 | **ISP** | Fat interface with unused methods | Split into focused interfaces | Classes implement only what they need |
-| **DIP** | High-level depends on low-level | Depend on abstractions, inject dependencies | Easy to test, swap implementations, reduce coupling |
+| **DIP** | High-level depends on low-level | Depend on abstractions, inject dependencies | Easy to test, swap implementations |
 
 ### Common Interview Questions
 
@@ -753,11 +683,4 @@ public static void main(String[] args) {
 
 5. **"Can you violate SOLID principles?"**
    - Yes, but pay a price: hard to test, hard to change, hard to maintain
-   - Start with clean design, refactor toward SOLID when problems appear
-
-### When to Apply SOLID
-
-- **Always**: When designing new systems from scratch
-- **Sometimes**: When adding to existing systems; refactor if needed
-- **Pragmatically**: Balance SOLID principles with practical constraints
-- **Iteratively**: Not all code needs to be perfect; refactor when pain points emerge
+   - Start with clean design, refactor toward SOLID when pain appears

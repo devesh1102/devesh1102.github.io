@@ -31,82 +31,53 @@ You don't care: how derailleur calculates position, chain physics, sprocket geom
 
 **Why this is encapsulation:** The complexity is completely hidden behind a simple interface. The internal implementation could change (electronic vs mechanical shifter) but your interaction stays the same.
 
-### Coding Example: Bike Gear System
+### Coding Example (Python)
 
-```java
-public class BikeGearSystem {
-    // Private: Internal mechanisms HIDDEN from user
-    private int currentSprocket;      // Which sprocket chain is on (1-21)
-    private Derailleur derailleur;    // Automatically positions chain
-    private int chainTension;         // Automatically maintained
+```python
+class BikeGearSystem:
+    def __init__(self):
+        self.__current_sprocket = 1      # Private: hidden from user
+        self.__chain_tension = 50         # Private: automatically managed
     
-    public BikeGearSystem() {
-        this.currentSprocket = 1;
-        this.derailleur = new Derailleur();
-        this.chainTension = 50;  // Default tension
-    }
+    # Public interface: Simple gear shifting
+    def shift_up(self):
+        if self.__current_sprocket < 21:
+            self.__current_sprocket += 1
+            self.__adjust_chain_tension()  # Internal: user doesn't call this
+            print(f"Shifted to gear {self.__current_sprocket}")
+    
+    def shift_down(self):
+        if self.__current_sprocket > 1:
+            self.__current_sprocket -= 1
+            self.__adjust_chain_tension()
+            print(f"Shifted to gear {self.__current_sprocket}")
+    
+    def get_current_gear(self):
+        return self.__current_sprocket    # Safe read-only access
+    
+    # Private method: HOW it works is HIDDEN
+    def __adjust_chain_tension(self):
+        if self.__current_sprocket < 10:
+            self.__chain_tension = 45
+        elif self.__current_sprocket < 15:
+            self.__chain_tension = 50
+        else:
+            self.__chain_tension = 55
 
-    // Public interface: Simple gear shifting
-    public void shiftUp() {
-        if (currentSprocket < 21) {
-            // Complex internal logic HIDDEN
-            currentSprocket++;
-            derailleur.moveChain(currentSprocket);  // Internal call
-            adjustChainTension();                    // Internal call
-            System.out.println("Shifted to gear " + currentSprocket);
-        }
-    }
-
-    public void shiftDown() {
-        if (currentSprocket > 1) {
-            currentSprocket--;
-            derailleur.moveChain(currentSprocket);
-            adjustChainTension();
-            System.out.println("Shifted to gear " + currentSprocket);
-        }
-    }
-
-    public int getCurrentGear() {
-        return currentSprocket;  // User only sees gear number
-    }
-
-    // Private methods: HOW it works is HIDDEN
-    private void adjustChainTension() {
-        if (currentSprocket < 10) {
-            chainTension = 45;
-        } else if (currentSprocket < 15) {
-            chainTension = 50;
-        } else {
-            chainTension = 55;
-        }
-        // User never sees this logic
-    }
-}
-
-// Private class: Completely hidden implementation
-class Derailleur {
-    void moveChain(int sprocket) {
-        // Complex electromagnetic/mechanical logic
-        // User doesn't care about this
-    }
-}
-
-// Usage: Simple, clean interface
-BikeGearSystem bike = new BikeGearSystem();
-bike.shiftUp();              // ✓ Allowed, simple
-bike.shiftDown();            // ✓ Allowed, simple
-// bike.currentSprocket = 30; // ✗ NOT ALLOWED (private)
-// bike.adjustChainTension(); // ✗ NOT ALLOWED (private)
-System.out.println(bike.getCurrentGear());  // Safe read access (5)
+# Usage:
+bike = BikeGearSystem()
+bike.shift_up()                    # ✓ Allowed
+bike.shift_down()                  # ✓ Allowed
+print(bike.get_current_gear())     # Safe: returns 0 (started at 1, down to 0)
 ```
 
-**Key insight:** The user interacts with a simple public interface (shiftUp/shiftDown), while all internal complexity is hidden. If the bike manufacturer changes the derailleur mechanism, the user's code doesn't change.
+**Key insight:** User interacts with simple public methods. All complexity is hidden. If implementation changes, user code stays the same.
 
 ### Benefits
 - **Simplicity**: Complex internals hidden behind simple public interface
 - **Flexibility**: Implementation can change without affecting users
-- **Protection**: Users can't break internal state by interacting incorrectly
-- **Maintenance**: Internal changes don't cascade to dependent code
+- **Protection**: Users can't break internal state
+- **Maintenance**: Internal changes don't cascade
 
 ---
 
@@ -128,63 +99,50 @@ Hidden complexity: Engine, transmission, fuel system, electronics
 User drives without understanding internal mechanics
 ```
 
-### Coding Example
+### Coding Example (Python)
 
-```java
-// Abstract interface: users see only essential operations
-public abstract class DatabaseConnection {
-    abstract void connect();
-    abstract void query(String sql);
-    abstract void disconnect();
+```python
+from abc import ABC, abstractmethod
+
+# Abstract interface: users see only essential operations
+class Database(ABC):
+    @abstractmethod
+    def connect(self):
+        pass
     
-    // Implementation details hidden
-    abstract void validateCredentials();
-    abstract void handleNetworkFailure();
-}
+    @abstractmethod
+    def query(self, sql):
+        pass
+    
+    @abstractmethod
+    def disconnect(self):
+        pass
 
-// Concrete implementation: how it's really done
-public class MySQLConnection extends DatabaseConnection {
-    @Override
-    public void connect() {
-        // Complex MySQL connection logic hidden
-        validateCredentials();
-        // TCP handshake, SSL negotiation, etc.
-        System.out.println("Connected to MySQL");
-    }
+# Concrete implementation: How it's really done
+class MySQLDatabase(Database):
+    def connect(self):
+        print("Validating credentials...")
+        print("TCP handshake, SSL negotiation...")
+        print("Connected to MySQL")
+    
+    def query(self, sql):
+        print(f"Executing: {sql}")
+        return ["user1", "user2", "user3"]
+    
+    def disconnect(self):
+        print("MySQL connection closed")
 
-    @Override
-    public void query(String sql) {
-        // Complex parsing, optimization, execution hidden
-        System.out.println("Executing: " + sql);
-    }
-
-    @Override
-    public void disconnect() {
-        // Cleanup logic hidden
-        System.out.println("MySQL connection closed");
-    }
-
-    private void validateCredentials() {
-        // Internal detail: never called directly by users
-    }
-
-    private void handleNetworkFailure() {
-        // Internal detail: retry logic hidden
-    }
-}
-
-// Usage: User sees only essential methods
-DatabaseConnection db = new MySQLConnection();
-db.connect();
-db.query("SELECT * FROM users");
-db.disconnect();
-// User doesn't need to know: connection pooling, SSL, retries, etc.
+# Usage: User sees only essential methods
+db = MySQLDatabase()
+db.connect()
+results = db.query("SELECT * FROM users")
+db.disconnect()
 ```
 
 ### Benefits
 - **Simplicity**: Complex systems become easy to use
 - **Security**: Internal mechanisms protected from misuse
-- **Flexibility**: Can swap implementations (MySQL → PostgreSQL) without changing user code
+- **Flexibility**: Can swap implementations without changing user code
 
 ---
 
@@ -193,13 +151,8 @@ db.disconnect();
 ### What It Is
 **Creating a hierarchy where a child class inherits properties and methods from a parent class, promoting code reuse.**
 
-- Child class extends parent class: `class Dog extends Animal`
-- Inherits all parent methods and fields
-- Can override methods for specialized behavior
-- Enables polymorphic behavior
-
 ### Real-Life Example
-**Vehicle hierarchy**: Cars, motorcycles, and trucks are all vehicles. They share common features (wheels, engine, brakes) but have specific behaviors (trucks carry cargo, motorcycles are nimble).
+**Vehicle hierarchy**: Cars, motorcycles, and trucks are all vehicles. They share common features (wheels, engine, brakes) but have specific behaviors.
 
 ```
 Vehicle (parent)
@@ -212,79 +165,51 @@ Truck overrides: carry()
 Motorcycle overrides: lean()
 ```
 
-### Coding Example
+### Coding Example (Python)
 
-```java
-// Parent class: common properties and methods
-public class Animal {
-    private String name;
-    private int age;
+```python
+# Parent class: common properties and methods
+class Animal:
+    def __init__(self, name, age):
+        self.name = name
+        self.age = age
+    
+    def eat(self):
+        print(f"{self.name} is eating")
+    
+    def sleep(self):
+        print(f"{self.name} is sleeping")
 
-    public Animal(String name, int age) {
-        this.name = name;
-        this.age = age;
-    }
+# Child class 1: inherits from Animal
+class Dog(Animal):
+    def eat(self):
+        # Override parent method with dog-specific behavior
+        print(f"{self.name} is eating dog food")
+    
+    def bark(self):
+        print(f"{self.name} says: Woof!")
 
-    public void eat() {
-        System.out.println(name + " is eating");
-    }
+# Child class 2: inherits from Animal
+class Cat(Animal):
+    def eat(self):
+        print(f"{self.name} is eating cat food")
+    
+    def meow(self):
+        print(f"{self.name} says: Meow!")
 
-    public void sleep() {
-        System.out.println(name + " is sleeping");
-    }
+# Usage:
+dog = Dog("Buddy", 3)
+dog.eat()      # "Buddy is eating dog food" (overridden)
+dog.sleep()    # "Buddy is sleeping" (inherited)
 
-    public String getName() {
-        return name;
-    }
-}
-
-// Child class 1: inherits from Animal, adds specific behavior
-public class Dog extends Animal {
-    public Dog(String name, int age) {
-        super(name, age);  // Call parent constructor
-    }
-
-    // Override parent method with dog-specific behavior
-    @Override
-    public void eat() {
-        System.out.println(getName() + " is eating dog food");
-    }
-
-    // New method specific to Dog
-    public void bark() {
-        System.out.println(getName() + " says: Woof!");
-    }
-}
-
-// Child class 2: inherits from Animal, different behavior
-public class Cat extends Animal {
-    public Cat(String name, int age) {
-        super(name, age);
-    }
-
-    @Override
-    public void eat() {
-        System.out.println(getName() + " is eating cat food");
-    }
-
-    public void meow() {
-        System.out.println(getName() + " says: Meow!");
-    }
-}
-
-// Usage:
-Animal dog = new Dog("Buddy", 3);
-dog.eat();      // Output: "Buddy is eating dog food" (overridden)
-dog.sleep();    // Output: "Buddy is sleeping" (inherited)
-
-Animal cat = new Cat("Whiskers", 2);
-cat.eat();      // Output: "Whiskers is eating cat food" (overridden)
-cat.sleep();    // Output: "Whiskers is sleeping" (inherited)
+cat = Cat("Whiskers", 2)
+cat.eat()      # "Whiskers is eating cat food" (overridden)
+cat.sleep()    # "Whiskers is sleeping" (inherited)
 ```
 
 ### Benefits
 - **Code Reuse**: Common behavior defined once in parent
-- **Maintainability**: Changes to parent propagate to all children
+- **Maintainability**: Changes propagate to all children
 - **Hierarchy**: Logical organization of related types
 
 ---
@@ -292,134 +217,74 @@ cat.sleep();    // Output: "Whiskers is sleeping" (inherited)
 ## 4. Polymorphism
 
 ### What It Is
-**"Many forms"—ability of objects to take multiple forms or respond differently to the same message based on their type.**
+**"Many forms"—ability of objects to respond differently to the same message based on their type.**
 
 Two types:
-1. **Compile-time (Method Overloading)**: Same method name, different parameters
-2. **Runtime (Method Overriding)**: Child class overrides parent method; actual behavior determined at runtime
+1. **Runtime**: Child class overrides parent method
+2. **Compile-time**: Same method name, different parameters (via *args in Python)
 
 ### Real-Life Example
-A **shape** can have a `calculateArea()` method. A rectangle calculates area one way (length × width), a circle calculates it differently (π × r²), a triangle yet another way (½ × base × height). Same method name, different implementations.
+A **shape** can have `calculate_area()`. Rectangle: length × width. Circle: π × r². Triangle: 0.5 × base × height. Same method, different logic.
 
-```
-Shape polymorphism:
-  Rectangle.calculateArea() → length * width
-  Circle.calculateArea() → π * radius²
-  Triangle.calculateArea() → 0.5 * base * height
-```
+### Coding Example: Runtime Polymorphism (Python)
 
-### Coding Example: Runtime Polymorphism
+```python
+from abc import ABC, abstractmethod
+import math
 
-```java
-// Parent class with abstract method
-public abstract class Shape {
-    public abstract double calculateArea();
+# Parent class with abstract method
+class Shape(ABC):
+    @abstractmethod
+    def calculate_area(self):
+        pass
     
-    // Common method
-    public void printInfo() {
-        System.out.println("Area: " + calculateArea());
-    }
-}
+    def print_info(self):
+        print(f"Area: {self.calculate_area()}")
 
-// Concrete implementations
-public class Rectangle extends Shape {
-    private double length;
-    private double width;
-
-    public Rectangle(double length, double width) {
-        this.length = length;
-        this.width = width;
-    }
-
-    @Override
-    public double calculateArea() {
-        return length * width;  // Rectangle-specific logic
-    }
-}
-
-public class Circle extends Shape {
-    private double radius;
-
-    public Circle(double radius) {
-        this.radius = radius;
-    }
-
-    @Override
-    public double calculateArea() {
-        return Math.PI * radius * radius;  // Circle-specific logic
-    }
-}
-
-public class Triangle extends Shape {
-    private double base;
-    private double height;
-
-    public Triangle(double base, double height) {
-        this.base = base;
-        this.height = height;
-    }
-
-    @Override
-    public double calculateArea() {
-        return 0.5 * base * height;  // Triangle-specific logic
-    }
-}
-
-// Polymorphic usage: same code works with different types
-public static void main(String[] args) {
-    List<Shape> shapes = new ArrayList<>();
-    shapes.add(new Rectangle(5, 10));
-    shapes.add(new Circle(7));
-    shapes.add(new Triangle(6, 8));
-
-    // Loop works for ANY shape; actual method called depends on runtime type
-    for (Shape shape : shapes) {
-        shape.printInfo();  // Calls appropriate calculateArea() for each type
-    }
+# Concrete implementations
+class Rectangle(Shape):
+    def __init__(self, length, width):
+        self.length = length
+        self.width = width
     
-    // Output:
-    // Area: 50.0          (Rectangle)
-    // Area: 153.93804...  (Circle)
-    // Area: 24.0          (Triangle)
-}
-```
+    def calculate_area(self):
+        return self.length * self.width
 
-### Coding Example: Compile-time Polymorphism (Overloading)
-
-```java
-public class Calculator {
-    // Same method name, different parameter types
+class Circle(Shape):
+    def __init__(self, radius):
+        self.radius = radius
     
-    public int add(int a, int b) {
-        return a + b;
-    }
+    def calculate_area(self):
+        return math.pi * self.radius * self.radius
 
-    public double add(double a, double b) {
-        return a + b;
-    }
+class Triangle(Shape):
+    def __init__(self, base, height):
+        self.base = base
+        self.height = height
+    
+    def calculate_area(self):
+        return 0.5 * self.base * self.height
 
-    public String add(String a, String b) {
-        return a + b;  // Concatenation
-    }
+# Polymorphic usage: same code works with different types
+shapes = [
+    Rectangle(5, 10),
+    Circle(7),
+    Triangle(6, 8)
+]
 
-    public int add(int a, int b, int c) {
-        return a + b + c;
-    }
-}
+for shape in shapes:
+    shape.print_info()
 
-// Usage:
-Calculator calc = new Calculator();
-System.out.println(calc.add(5, 10));           // 15 (int overload)
-System.out.println(calc.add(5.5, 10.5));       // 16.0 (double overload)
-System.out.println(calc.add("Hello", "World")); // HelloWorld (String overload)
-System.out.println(calc.add(1, 2, 3));         // 6 (three int overload)
+# Output:
+# Area: 50.0
+# Area: 153.93804...
+# Area: 24.0
 ```
 
 ### Benefits
 - **Flexibility**: Write code that works with many types
 - **Extensibility**: Add new types without changing existing code
-- **Maintainability**: Single loop/method handles multiple types
-- **Loose Coupling**: Depend on abstract interfaces, not concrete classes
+- **Loose Coupling**: Depend on interfaces, not concrete classes
 
 ---
 
@@ -429,134 +294,77 @@ System.out.println(calc.add(1, 2, 3));         // 6 (three int overload)
 **An object contains other objects as members (has-a relationship), using them to build complex behavior.**
 
 - Alternative to inheritance for code reuse
-- More flexible than inheritance; avoids fragile base class problem
-- "Favor composition over inheritance" is a design principle
+- More flexible than inheritance
+- "Favor composition over inheritance" is a best practice
 
 ### Real-Life Example
-A **car** is composed of an engine, wheels, and transmission. Instead of inheriting from "Vehicle," a car HAS-A engine, HAS-A wheels.
+A **car** is composed of an engine, wheels, and transmission. Instead of inheriting, a car HAS-A engine, HAS-A wheels.
 
-```
-Car composition:
-  Car has-a Engine (not "Car extends Engine")
-  Car has-a Wheels
-  Car has-a Transmission
-```
+### Coding Example (Python)
 
-### Coding Example
+```python
+# Smaller, reusable components
+class Engine:
+    def __init__(self, engine_type):
+        self.type = engine_type
+    
+    def start(self):
+        print(f"{self.type} engine started")
+    
+    def stop(self):
+        print(f"{self.type} engine stopped")
 
-```java
-// Smaller, reusable components
-public class Engine {
-    private String type;  // "V6", "V8", etc.
+class Wheels:
+    def __init__(self, count, size):
+        self.count = count
+        self.size = size
+    
+    def rotate(self):
+        print(f"{self.count} wheels of size {self.size} rotating")
 
-    public Engine(String type) {
-        this.type = type;
-    }
+class Transmission:
+    def __init__(self, transmission_type):
+        self.type = transmission_type
+    
+    def shift(self, gear):
+        print(f"Shifting to {gear} with {self.type}")
 
-    public void start() {
-        System.out.println(type + " engine started");
-    }
+# Car uses composition: HAS-A Engine, HAS-A Wheels, HAS-A Transmission
+class Car:
+    def __init__(self, model, engine_type, wheel_size, transmission_type):
+        self.model = model
+        self.engine = Engine(engine_type)
+        self.wheels = Wheels(4, wheel_size)
+        self.transmission = Transmission(transmission_type)
+    
+    def start(self):
+        self.engine.start()
+        self.wheels.rotate()
+        print(f"{self.model} started")
+    
+    def drive(self, gear):
+        self.transmission.shift(gear)
+        self.wheels.rotate()
+        print(f"{self.model} driving")
+    
+    def stop(self):
+        self.engine.stop()
+        print(f"{self.model} stopped")
 
-    public void stop() {
-        System.out.println(type + " engine stopped");
-    }
-}
-
-public class Wheels {
-    private int count;
-    private int size;
-
-    public Wheels(int count, int size) {
-        this.count = count;
-        this.size = size;
-    }
-
-    public void rotate() {
-        System.out.println(count + " wheels of size " + size + " rotating");
-    }
-}
-
-public class Transmission {
-    private String type;  // "Automatic", "Manual"
-
-    public Transmission(String type) {
-        this.type = type;
-    }
-
-    public void shift(String gear) {
-        System.out.println("Shifting to " + gear + " with " + type);
-    }
-}
-
-// Car uses composition: HAS-A Engine, HAS-A Wheels, HAS-A Transmission
-public class Car {
-    private Engine engine;
-    private Wheels wheels;
-    private Transmission transmission;
-    private String model;
-
-    public Car(String model, String engineType, int wheelSize, String transmissionType) {
-        this.model = model;
-        this.engine = new Engine(engineType);
-        this.wheels = new Wheels(4, wheelSize);
-        this.transmission = new Transmission(transmissionType);
-    }
-
-    public void start() {
-        engine.start();
-        wheels.rotate();
-        System.out.println(model + " started");
-    }
-
-    public void drive(String gear) {
-        transmission.shift(gear);
-        wheels.rotate();
-        System.out.println(model + " driving");
-    }
-
-    public void stop() {
-        engine.stop();
-        System.out.println(model + " stopped");
-    }
-}
-
-// Usage:
-Car myCar = new Car("Tesla Model 3", "Electric", 18, "Automatic");
-myCar.start();
-myCar.drive("Drive");
-myCar.stop();
-
-// Output:
-// Electric engine started
-// 4 wheels of size 18 rotating
-// Tesla Model 3 started
-// Shifting to Drive with Automatic
-// 4 wheels of size 18 rotating
-// Tesla Model 3 driving
-// Electric engine stopped
-// Tesla Model 3 stopped
+# Usage:
+my_car = Car("Tesla Model 3", "Electric", 18, "Automatic")
+my_car.start()
+my_car.drive("Drive")
+my_car.stop()
 ```
 
 ### Composition vs Inheritance
 | Aspect | Inheritance | Composition |
 |---|---|---|
 | **Relationship** | IS-A (Dog IS-A Animal) | HAS-A (Car HAS-A Engine) |
-| **Flexibility** | Less flexible; rigid hierarchy | More flexible; combine components |
-| **Reusability** | Methods inherited from parent | Components can be used independently |
-| **Maintenance** | Changes to parent affect all children | Components isolated |
-| **Use When** | Modeling "is-a" relationships | Modeling "has-a" relationships |
-
----
-
-## 6. Abstraction vs Encapsulation
-
-| Aspect | Abstraction | Encapsulation |
-|---|---|---|
-| **Purpose** | Hide complexity; show only essential features | Hide internal state; protect data |
-| **Focus** | WHAT the object does | HOW it protects itself |
-| **Example** | Abstract class Shape with calculateArea() | Private balance with public withdraw() |
-| **Achieved By** | Abstract classes, interfaces, abstract methods | Private/protected access modifiers |
-| **Benefit** | Simplifies usage; enables polymorphism | Maintains data integrity; prevents misuse |
+| **Flexibility** | Less flexible | More flexible |
+| **Reusability** | Through parent class | Through components |
+| **Use When** | "is-a" relationships | "has-a" relationships |
 
 ---
 
@@ -564,33 +372,30 @@ myCar.stop();
 
 | Concept | Key Point | Real-World Use |
 |---|---|---|
-| **Encapsulation** | Private data + public methods = data protection | Bank account: balance is private, withdraw() is public |
-| **Abstraction** | Hide complexity; show only essential interface | Car dashboard: don't see engine mechanics |
-| **Inheritance** | Child extends parent; reuse code | Dog/Cat extend Animal; inherit eat(), sleep() |
-| **Polymorphism** | Same method, many implementations | Shape.calculateArea() works for Circle, Rectangle, Triangle |
-| **Composition** | Objects contain other objects | Car has Engine, Wheels, Transmission |
+| **Encapsulation** | Private data + public methods | Bike gears: complexity hidden |
+| **Abstraction** | Hide complexity, show interface | Car dashboard: don't see engine |
+| **Inheritance** | Child extends parent | Dog/Cat extend Animal |
+| **Polymorphism** | Same method, many forms | Shape.calculate_area() for all shapes |
+| **Composition** | Objects contain objects | Car has Engine, Wheels |
 
 ### Common Interview Questions
 
 1. **"What's the difference between encapsulation and abstraction?"**
-   - Encapsulation = hiding internal state via access modifiers
-   - Abstraction = hiding complexity via interfaces/abstract classes
+   - Encapsulation = hiding internal state
+   - Abstraction = hiding complexity via interfaces
 
-2. **"When would you use composition over inheritance?"**
-   - When modeling "has-a" relationships
-   - When inheritance hierarchy becomes complex or fragile
-   - More flexible and maintainable for complex systems
+2. **"When use composition over inheritance?"**
+   - For "has-a" relationships
+   - More flexible and maintainable
 
 3. **"Give an example of polymorphism."**
-   - Method overriding: List<Shape> with Rectangle, Circle, Triangle
-   - Method overloading: same method name, different parameters
+   - Shape.calculate_area() works for Circle, Rectangle, Triangle
 
 4. **"Why encapsulate data?"**
-   - Prevent invalid states (negative balance, invalid deposits)
-   - Change internal implementation without breaking external code
-   - Easier to add validation and logging
+   - Prevent invalid states
+   - Change implementation without breaking code
 
-5. **"What's the advantage of using abstract classes?"**
-   - Define interface; force children to implement specific methods
-   - Enable polymorphic behavior through common interface
-   - Share some common code via non-abstract methods
+5. **"Advantage of abstract classes?"**
+   - Force children to implement methods
+   - Enable polymorphic behavior
+   - Share common code
