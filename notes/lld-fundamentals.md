@@ -41,16 +41,17 @@ Use inheritance only for a genuine **is-a** relationship with stable shared beha
 
 Different implementations can satisfy the same contract:
 
-```java
-interface PricingStrategy {
-    Money calculate(Ticket ticket);
-}
+```python
+from abc import ABC, abstractmethod
 
-final class HourlyPricing implements PricingStrategy {
-    public Money calculate(Ticket ticket) {
-        return Money.ofHours(ticket.getDuration());
-    }
-}
+class PricingStrategy(ABC):
+    @abstractmethod
+    def calculate(self, ticket):
+        pass
+
+class HourlyPricing(PricingStrategy):
+    def calculate(self, ticket):
+        return Money.of_hours(ticket.duration)
 ```
 
 ### Composition
