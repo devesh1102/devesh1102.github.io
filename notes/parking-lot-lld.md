@@ -25,24 +25,52 @@ ParkingTicket -> Payment
 
 ### Main Types
 
-```java
-enum VehicleType { MOTORCYCLE, CAR, TRUCK }
-enum SpotType { MOTORCYCLE, COMPACT, LARGE }
-enum SpotStatus { AVAILABLE, OCCUPIED, OUT_OF_SERVICE }
-enum TicketStatus { ACTIVE, PAID, LOST }
+```python
+from enum import Enum
 
-record Vehicle(String registrationNumber, VehicleType type) {}
+class VehicleType(Enum):
+    MOTORCYCLE = 1
+    CAR = 2
+    TRUCK = 3
 
-final class ParkingSpot {
-    private final String id;
-    private final SpotType type;
-    private SpotStatus status;
-    private Vehicle vehicle;
+class SpotType(Enum):
+    MOTORCYCLE = 1
+    COMPACT = 2
+    LARGE = 3
 
-    boolean canFit(Vehicle candidate) { /* compatibility rules */ }
-    void occupy(Vehicle candidate) { /* validate and update atomically */ }
-    void release() { /* clear vehicle and mark available */ }
-}
+class SpotStatus(Enum):
+    AVAILABLE = 1
+    OCCUPIED = 2
+    OUT_OF_SERVICE = 3
+
+class TicketStatus(Enum):
+    ACTIVE = 1
+    PAID = 2
+    LOST = 3
+
+class Vehicle:
+    def __init__(self, registration_number, vehicle_type):
+        self.registration_number = registration_number
+        self.type = vehicle_type
+
+class ParkingSpot:
+    def __init__(self, spot_id, spot_type):
+        self.id = spot_id
+        self.type = spot_type
+        self.status = SpotStatus.AVAILABLE
+        self.vehicle = None
+
+    def can_fit(self, candidate):
+        """Check compatibility rules"""
+        pass
+
+    def occupy(self, candidate):
+        """Validate and update atomically"""
+        pass
+
+    def release(self):
+        """Clear vehicle and mark available"""
+        pass
 ```
 
 ## Responsibilities
@@ -59,22 +87,22 @@ final class ParkingSpot {
 
 ## Allocation Strategy
 
-```java
-interface SpotAllocationStrategy {
-    Optional<ParkingSpot> allocate(Vehicle vehicle, List<ParkingFloor> floors);
-}
+```python
+from abc import ABC, abstractmethod
+from typing import Optional, List
 
-final class NearestSpotStrategy implements SpotAllocationStrategy {
-    public Optional<ParkingSpot> allocate(
-        Vehicle vehicle,
-        List<ParkingFloor> floors
-    ) {
-        return floors.stream()
-            .flatMap(floor -> floor.availableSpots().stream())
-            .filter(spot -> spot.canFit(vehicle))
-            .findFirst();
-    }
-}
+class SpotAllocationStrategy(ABC):
+    @abstractmethod
+    def allocate(self, vehicle, floors) -> Optional[ParkingSpot]:
+        pass
+
+class NearestSpotStrategy(SpotAllocationStrategy):
+    def allocate(self, vehicle, floors) -> Optional[ParkingSpot]:
+        for floor in floors:
+            for spot in floor.available_spots():
+                if spot.can_fit(vehicle):
+                    return spot
+        return None
 ```
 
 The Strategy pattern allows nearest, cheapest, accessible, or reservation-aware allocation without changing entry logic.
@@ -87,14 +115,16 @@ The Strategy pattern allows nearest, cheapest, accessible, or reservation-aware 
 4. A ticket is created with entry time and spot ID.
 5. Availability counters and the display board are updated.
 
-```java
-ParkingTicket park(Vehicle vehicle) {
-    ParkingSpot spot = allocator.allocate(vehicle, lot.getFloors())
-        .orElseThrow(NoSpotAvailableException::new);
+```python
+def park(vehicle):
+    spot = allocator.allocate(vehicle, lot.get_floors())
+    if not spot:
+        raise NoSpotAvailableException()
 
-    spot.occupy(vehicle);
-    return ticketRepository.save(ParkingTicket.open(vehicle, spot, clock.now()));
-}
+    spot.occupy(vehicle)
+    return ticket_repository.save(
+        ParkingTicket.open(vehicle, spot, clock.now())
+    )
 ```
 
 ## Exit and Payment Flow
