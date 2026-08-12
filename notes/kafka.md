@@ -506,6 +506,81 @@ Use Kafka transactions + idempotent producer
 Requires additional coordination
 ```
 
+### Kafka Is a Durable Log, Not Just a Queue
+
+Kafka can be used like a queue, but internally it is an **append-only log**. Reading a
+record does not delete it. Kafka retains records for the configured retention period,
+while each consumer group stores an offset representing its position in every
+partition.
+
+```
+Partition 0:
+
+Offset:    0         1         2
+Record:  Email A   Email B   Email C
+                              ▲
+                    Consumer group's next position
+```
+
+If the consumer commits offset `2`, it continues from the following offset. If it
+crashes before committing, another consumer in the group can read the uncommitted
+record again. This enables recovery and replay, but also means consumers must tolerate
+duplicate processing.
+
+Within a consumer group, Kafka assigns each partition to only one consumer at a time:
+
+```
+Partition 0 ──▶ Email Executor 1
+Partition 1 ──▶ Email Executor 2
+Partition 2 ──▶ Email Executor 3
+```
+
+This distributes work while preserving ordering inside each partition.
+
+### Handling an Email Executor Failure
+
+Store one logical email per Kafka record. An executor may poll a batch of records for
+efficiency, but it should process and track every email independently.
+
+```
+Executor polls emails 1-20:
+
+1-7   → provider accepted; result saved in the delivery ledger
+8     → temporary provider failure
+9-20  → not processed because the executor crashes
+```
+
+If the relevant offset was not committed, Kafka redelivers the records after another
+executor takes ownership of the partition. The executor checks the delivery ledger
+using `email_id` or an idempotency key:
+
+```
+1-7   → already accepted; do not send again
+8-20  → retry processing
+```
+
+Recommended processing order:
+
+```
+1. Read the Kafka record.
+2. Claim email_id in the delivery ledger.
+3. Check whether the provider has already accepted it.
+4. Send the email.
+5. Persist the provider message ID and result.
+6. Commit the Kafka offset only after the result is durable.
+```
+
+For failures:
+
+* Send transient failures to a retry topic with exponential backoff.
+* Mark permanent failures, such as an invalid address, without retrying.
+* Move records exceeding the retry limit to a dead-letter topic for investigation.
+* Commit the original offset only after the retry or dead-letter record is durable.
+
+There is one unavoidable ambiguous case: the provider accepts an email, but the
+executor crashes before saving the response. Reconcile through the provider's
+idempotency key or status API when available. Otherwise, an at-least-once design must
+prefer a rare duplicate over losing the email.
 
 ## Key Configurations
 

@@ -1,489 +1,521 @@
-# Orders App — System Design (Swiggy / Uber Eats / Amazon)
+# Orders App — Interview System Design
 
-## TL;DR
-* **Architecture**: Event-driven microservices — each service owns its state, communicates via Kafka
-* **Order lifecycle**: State machine — every transition is a Kafka event consumed by downstream services
-* **Cart**: Redis (ephemeral, TTL-based) — never written to the primary DB
-* **Payment**: Synchronous (user waits); everything else is async Kafka consumers
-* **Background jobs**: Order timeouts, payment retries, invoice generation, refunds — all async
-* **Real-time tracking**: WebSocket + Redis pub/sub for partner GPS pings
-* **Key insight**: Kafka events are the audit log. Each service reacts independently — easy to retry, debug, scale.
+## 60-Second Answer
+
+* The **Order Service** owns the order lifecycle.
+* The **Payment Service** owns payment state and talks to Stripe/Razorpay.
+* Order Service calls Payment Service **synchronously** so the user gets an immediate answer.
+* Payment Service also publishes a durable `payment.succeeded` or `payment.failed` event through Kafka.
+* Order Service consumes that event, updates the order, then publishes order events for restaurant, delivery, and notifications.
+* Use an **outbox table** in each service so a database update cannot happen without its Kafka event eventually being published.
+
+> **Interview sentence:** "Payment is the one deliberate synchronous call for user experience; Kafka remains the durable source of truth for completing the workflow."
 
 ---
 
-## Step 1: Clarify Requirements
+## 1. Requirements
 
-### Functional Requirements
-- Browse menu, add items to cart
-- Place order → payment → restaurant confirmation → delivery assignment
-- Real-time order status updates pushed to client
-- Live delivery partner location on map
-- Order cancellation (before restaurant confirms)
-- Notifications at each stage (push / SMS / email)
+### Functional
 
-### Non-Functional Requirements
+- Browse items and maintain a cart
+- Place an order and pay
+- Restaurant accepts and prepares the order
+- Assign a delivery partner
+- Show order status and live partner location
+- Cancel and refund when allowed
+- Notify the user at every important stage
+
+### Non-functional
+
 | Requirement | Target |
 |---|---|
-| Scale | ~3M orders/day, peak ~200 orders/sec (dinner rush) |
-| Latency | Order placement < 2s end-to-end (payment included) |
-| Availability | 99.99% — revenue lost directly on downtime |
-| Consistency | Strong for payments; eventual for notifications/tracking |
-| Idempotency | Same order request must never charge twice |
-
-### Out of Scope
-- Restaurant menu management system
-- Delivery partner app internals
-- Fraud detection / ML risk scoring
+| Order placement | Under 2 seconds, including payment |
+| Payment correctness | Never charge twice |
+| Availability | 99.99% |
+| Order consistency | Strong |
+| Notifications/tracking | Eventual consistency is acceptable |
+| Scale | About 3 million orders/day, 200/sec peak |
 
 ---
 
-## Step 2: Capacity Estimation
+## 2. Interview Architecture
 
-| Metric | Estimate |
+Draw only this diagram first:
+
+```mermaid
+flowchart LR
+    C([Client]) --> AG[API Gateway]
+    AG --> O[Order Service]
+    O --> ODB[(Order DB)]
+
+    O -->|synchronous charge| P[Payment Service]
+    P --> PG[Stripe / Razorpay]
+    P --> PDB[(Payment DB<br/>transaction + outbox)]
+    P -->|payment events<br/>via outbox publisher| K[[Kafka]]
+    K --> O
+    ODB -->|order events| K
+
+    K --> R[Restaurant Service]
+    K --> D[Delivery Service]
+    K --> N[Notification Service]
+
+    N -->|publish user:userId| PUB[(Redis Pub/Sub<br/>notification channels)]
+    PUB --> WS[WebSocket Gateway]
+    WS --> C
+    N --> PUSH[FCM / APNs]
+
+    D --> LOC[(Redis<br/>partner locations)]
+    LOC --> T[Tracking Service]
+    T -->|publish order:orderId| PUB
+
+    style C fill:#1f6feb,color:#fff
+    style ODB fill:#3fb950,color:#fff
+    style PDB fill:#3fb950,color:#fff
+    style K fill:#f0883e,color:#fff
+    style PUB fill:#f85149,color:#fff
+    style LOC fill:#f85149,color:#fff
+```
+
+### What each service owns
+
+| Service | Responsibility |
 |---|---|
-| Orders/day | 3 million |
-| Peak orders/sec | ~200/sec (7–9pm dinner rush) |
-| DB writes per order | ~10 (order + items + events + payment + assignment) |
-| Peak DB writes/sec | ~2,000/sec |
-| GPS pings | 1M active deliveries × 1 ping/5s = **200k Redis writes/sec** |
-| Notifications/day | ~15M (5 per order average) |
+| **Order Service** | Cart validation, order state, order items, cancellation rules |
+| **Payment Service** | Charges, payment transactions, gateway webhooks, refunds |
+| **Restaurant Service** | Restaurant acceptance and preparation |
+| **Delivery Service** | Partner assignment and delivery state |
+| **Notification Service** | Consumes Kafka events, publishes online-user updates to Redis channels, and uses FCM/APNs for offline users |
+| **Tracking Service** | Reads live GPS data and publishes it to an order-specific Redis channel |
+| **WebSocket Gateway** | Holds client connections, subscribes to Redis channels, and pushes updates to local sockets |
+
+### The communication rule
+
+Kafka is the default:
+
+```text
+Restaurant Service does not call Delivery Service.
+Delivery Service does not call Notification Service.
+They publish events and interested services consume them.
+```
+
+Payment is the one exception:
+
+```text
+Order Service ──synchronous──> Payment Service
+```
+
+The user is waiting to know whether payment succeeded, so this call is synchronous. Payment still emits a Kafka event for durability and recovery.
+
+### How notifications reach the user
+
+```text
+order.confirmed
+      ↓
+Kafka
+      ↓
+Notification Service
+      ↓
+Redis channel user:{userId}
+      ↓
+WebSocket Gateway holding that user's connection
+      ↓
+Customer app
+```
+
+Users never connect directly to Redis. They connect to a WebSocket Gateway. The gateway subscribes to channels for its locally connected users and forwards each event to the correct socket.
+
+Kafka and Redis have different jobs:
+
+| Component | Job |
+|---|---|
+| **Kafka** | Durable service-to-service event delivery |
+| **Redis Pub/Sub** | Fast routing to the WebSocket server holding the connected user |
+| **WebSocket Gateway** | Final delivery from the backend to the user's open app |
 
 ---
 
-## Step 3: High-Level Architecture
+## 3. Why Payment Service Publishes the Payment Event
 
-![High-Level Architecture](./images/orders-arch.svg)
+Payment Service owns the payment transaction, so it should publish:
 
-#### What each service does
+```text
+payment.succeeded
+payment.failed
+refund.succeeded
+refund.failed
+```
 
-**API Gateway**
-Every request from the client app goes through the API Gateway first. It handles JWT authentication (rejects unauthenticated requests before they hit any service), rate limiting per user (prevents abuse during flash sales), and routes requests to the correct downstream service. It does NOT contain any business logic.
+Order Service should not pretend to own payment facts. It consumes the payment event and translates it into order facts:
 
-**Order Service**
-The core of the system. It owns the `orders` and `order_items` tables in PostgreSQL. Its responsibilities:
-- Validates the cart snapshot (are items still available? prices correct?)
-- Creates the order row with status `PLACED`
-- Calls the Payment Service **synchronously** (user waits on this)
-- Transitions the order state in DB after payment
-- Publishes Kafka events on every state transition — these are the trigger for everything downstream
+```text
+payment.succeeded
+        ↓
+Order Service updates order
+        ↓
+order.payment_confirmed
+```
 
-**Payment Service**
-Called synchronously by the Order Service. Talks to the external payment gateway (Stripe / Razorpay). Returns success or failure. Stores a `payment_transactions` record for audit. Passes the `idempotency_key` to the gateway so the same charge is never made twice even on retries.
+This separation keeps ownership clear:
 
-**Restaurant Service**
-Kafka consumer. Listens for `order.payment_confirmed`. Sends the order to the restaurant's POS system or app. Waits for the restaurant to accept. Publishes `order.confirmed` or triggers the cancellation flow on timeout.
-
-**Delivery Service**
-Kafka consumer. Listens for `order.confirmed`. Finds the nearest available delivery partner using geospatial queries. Assigns them to the order. Also continuously receives GPS pings from all active partners and stores their location in Redis.
-
-**Notification Service**
-Kafka consumer. Listens for every order event (`placed`, `confirmed`, `preparing`, `out_for_delivery`, `delivered`, `cancelled`). Sends push notification / SMS / email at each stage. Fully stateless — just reads the event and fires the notification.
-
-**Tracking Service**
-Reads partner locations from Redis every 2 seconds and pushes updates to the customer's open WebSocket connection. Maintains WebSocket sessions per active delivery.
+| Fact | Owner |
+|---|---|
+| Card was charged | Payment Service |
+| Order can go to restaurant | Order Service |
 
 ---
 
-## How Services Are Connected — The Mental Model
+## 4. Placing an Order — Complete Flow
 
-Before the full flow, this is the single most important thing to understand:
+```mermaid
+sequenceDiagram
+    participant C as Client
+    participant O as Order Service
+    participant P as Payment Service
+    participant G as Payment Gateway
+    participant K as Kafka
+    participant R as Restaurant Service
 
-> **Services never call each other directly. There are no REST calls from Delivery Service to Notification Service, or from Restaurant Service to Delivery Service. Every service only talks to Kafka.**
+    C->>O: Place order + idempotency key
+    O->>O: Validate cart and create PAYMENT_PENDING
+    O->>P: Charge(orderId, amount, key)
+    P->>G: Charge using same key
+    G-->>P: Success
+    P->>P: Save transaction + outbox event
+    P-->>O: Immediate success response
+    O-->>C: Payment received
 
-Think of Kafka as a **notice board**. A service posts a notice (publishes an event). Any other service that cares about that notice reads it (consumes the event). The publisher has no idea who is reading — and doesn't need to.
+    P->>K: payment.succeeded
+    K->>O: Consume payment result
+    O->>O: Set PAYMENT_CONFIRMED + write order outbox
+    O->>K: order.payment_confirmed
+    K->>R: Send order to restaurant
+```
 
-![Service Connections via Kafka](./images/orders-service-connections.svg)
+### Step by step
 
-Each service has two lists:
-- **What it publishes** — events it fires when something happens in its domain
-- **What it subscribes to** — events from other domains it needs to react to
+1. Client sends the cart and a client-generated `idempotency_key`.
+2. Order Service checks stock, prices, and restaurant availability.
+3. Order Service creates the order as `PAYMENT_PENDING`.
+4. Order Service synchronously asks Payment Service to charge.
+5. Payment Service charges the gateway using the same idempotency key.
+6. Payment Service stores the transaction and a payment outbox event together.
+7. Payment Service returns success/failure immediately for good user experience.
+8. Its outbox publishes the durable payment event to Kafka.
+9. Order Service consumes the event and updates its state.
+10. Order Service publishes `order.payment_confirmed`.
+11. Restaurant and Notification services consume that order event.
 
-### Each service's publish / subscribe contract
+### Why use both HTTP and Kafka?
 
-**Order Service**
-- Publishes: `order.payment_confirmed`
-- Subscribes to: nothing (it's the entry point, triggered by the client directly)
+| Path | Purpose |
+|---|---|
+| Synchronous HTTP response | Give the user an immediate answer |
+| Kafka payment event | Guarantee that services eventually agree |
 
-**Restaurant Service**
-- Publishes: `order.confirmed`, `order.preparing`
-- Subscribes to: `order.payment_confirmed` — this is how it knows a paid order arrived
+Example failure:
 
-**Delivery Service**
-- Publishes: `order.partner_assigned`, `order.out_for_delivery`, `order.delivered`, `order.cancelled`
-- Subscribes to: `order.confirmed` — this is how it knows it's time to find a delivery partner
+```text
+Gateway charged the card
+        ↓
+Payment Service saved SUCCESS
+        ↓
+HTTP response to Order Service was lost
+```
 
-**Notification Service**
-- Publishes: nothing (it only sends notifications, never changes order state)
-- Subscribes to: **every** order event — `payment_confirmed`, `confirmed`, `preparing`, `out_for_delivery`, `delivered`, `cancelled`
-
-**Tracking Service**
-- Publishes: nothing
-- Subscribes to: `order.out_for_delivery` (start GPS streaming), `order.delivered` (stop GPS streaming)
-
-**Invoice Service**
-- Publishes: nothing
-- Subscribes to: `order.delivered` (generate receipt PDF)
-
-**Refund Service**
-- Publishes: nothing
-- Subscribes to: `order.cancelled` (trigger payment reversal)
-
----
-
-### Why this matters
-
-**Adding a new feature = add a new consumer. Zero changes to existing services.**
-
-Say you want to add a loyalty points service that gives points on every delivery. You create a new service that subscribes to `order.delivered` and awards points. The Order Service, Delivery Service, Restaurant Service — none of them change at all. They don't even know the loyalty service exists.
-
-**A service going down doesn't break the order flow.**
-
-If the Notification Service crashes, orders still get placed, confirmed, and delivered. Kafka holds onto the unread events (for days, by default). When Notification Service comes back up, it reads from its last committed offset and sends all the missed notifications in order.
-
-**Each service owns its own database.**
-
-No service reads another service's DB directly. The only shared communication channel is Kafka. This means:
-- Restaurant Service can use PostgreSQL
-- Tracking Service can use Redis
-- Invoice Service can use S3
-- None of them need to know what the others use
+The user may briefly see "processing," but `payment.succeeded` still reaches Order Service and repairs the order.
 
 ---
 
-## End-to-End Order Flow — How Kafka Connects Everything
+## 5. Outbox Pattern
 
-This is the full sequential journey of one order, from tap to delivery, showing exactly when each Kafka event fires and who reacts to it.
+Without an outbox, this can happen:
 
-![Full Kafka Event Flow](./images/orders-kafka-flow.svg)
+```text
+Payment transaction saved successfully
+        ↓
+Service crashes before publishing to Kafka
+        ↓
+Card charged, but Order Service never knows
+```
 
-### Step-by-step walkthrough
+The fix:
 
----
+```text
+One database transaction:
+  1. Save payment transaction
+  2. Save outbox row
 
-**Step 1 — User places order (SYNC)**
+Background publisher:
+  3. Read outbox row
+  4. Publish to Kafka
+  5. Mark outbox row published
+```
 
-User taps "Place Order". `POST /order` hits the Order Service with a cart snapshot and an `idempotency_key`.
+The Payment Service and Order Service each have their own outbox because each owns a separate database.
 
-- Order Service validates the cart and creates an `orders` row → status `PLACED`
-- Calls the Payment Service **synchronously** — this is the only blocking call in the entire system
-- Payment Service talks to Stripe/Razorpay and returns success
-- Order Service updates status → `PAYMENT_CONFIRMED`, writes the event to the **outbox table**
-- Outbox poller publishes **`order.payment_confirmed`** to Kafka
-- Order Service returns `200 OK` to the client
-
-> **The client is unblocked here.** Everything below is async — the user sees "Order Placed!" while the rest happens in the background.
-
----
-
-**Step 2 — Restaurant is notified (ASYNC)**
-
-Kafka event: `order.payment_confirmed`
-
-**Two consumers react in parallel:**
-
-→ **Restaurant Service** receives the event. It pushes the order to the restaurant's POS system and starts a 3-minute acceptance timer.
-
-→ **Notification Service** receives the same event. Sends a push notification to the user: *"We received your order!"*
-
-These two consumers are in **different consumer groups** — both get the full event independently. Neither blocks the other.
+> **Interview sentence:** "The outbox closes the gap between committing domain state and publishing the corresponding event."
 
 ---
 
-**Step 3 — Restaurant accepts (ASYNC)**
+## 6. Order State Machine
 
-Restaurant operator taps "Accept" in their app. Restaurant Service:
-- Updates the order status in DB → `CONFIRMED`
-- Publishes **`order.confirmed`** to Kafka
+```mermaid
+stateDiagram-v2
+    [*] --> PAYMENT_PENDING
+    PAYMENT_PENDING --> PAYMENT_CONFIRMED : payment.succeeded
+    PAYMENT_PENDING --> PAYMENT_FAILED : payment.failed
+    PAYMENT_CONFIRMED --> RESTAURANT_CONFIRMED : restaurant accepts
+    PAYMENT_CONFIRMED --> CANCELLED : restaurant timeout
+    RESTAURANT_CONFIRMED --> PREPARING
+    PREPARING --> OUT_FOR_DELIVERY : partner picks up
+    OUT_FOR_DELIVERY --> DELIVERED
+    RESTAURANT_CONFIRMED --> CANCELLED : valid cancellation
+    CANCELLED --> REFUND_PENDING : payment existed
+    REFUND_PENDING --> REFUNDED : refund.succeeded
+```
 
-**Two consumers react:**
-
-→ **Delivery Service** receives `order.confirmed`. It queries nearby available partners using geospatial index (partner location stored in Redis). Assigns the closest partner. Publishes **`order.partner_assigned`**.
-
-→ **Notification Service** receives `order.confirmed`. Sends: *"Your order has been confirmed by the restaurant!"*
-
----
-
-**Step 4 — Cooking starts (ASYNC)**
-
-Restaurant taps "Start Cooking". Restaurant Service publishes **`order.preparing`**.
-
-→ **Notification Service** sends: *"The restaurant is preparing your food."*
-
-No other service needs to act on this event — it's purely informational for the user.
-
----
-
-**Step 5 — Partner picks up (ASYNC)**
-
-Delivery partner arrives at the restaurant and taps "Picked Up". Delivery Service:
-- Updates order status → `OUT_FOR_DELIVERY`
-- Publishes **`order.out_for_delivery`**
-
-**Two consumers react:**
-
-→ **Notification Service** sends: *"Your order is on the way!"*
-
-→ **Tracking Service** receives the event and **opens a WebSocket session** for this order. From now on it polls `GET location:{partnerId}` from Redis every 2 seconds and pushes GPS coordinates to the customer's app in real time.
+| State | Meaning |
+|---|---|
+| `PAYMENT_PENDING` | Order exists; payment result is not finalized |
+| `PAYMENT_CONFIRMED` | Payment event consumed; restaurant workflow can start |
+| `PAYMENT_FAILED` | Charge failed; user may retry |
+| `RESTAURANT_CONFIRMED` | Restaurant accepted |
+| `PREPARING` | Food is being prepared |
+| `OUT_FOR_DELIVERY` | Partner picked it up |
+| `DELIVERED` | Completed |
+| `CANCELLED` | Workflow stopped |
+| `REFUND_PENDING` | Refund requested from Payment Service |
+| `REFUNDED` | Payment Service confirmed reversal |
 
 ---
 
-**Step 6 — Order delivered (ASYNC)**
+## 7. Kafka Events
 
-Partner taps "Delivered" (or OTP is confirmed). Delivery Service:
-- Updates order status → `DELIVERED`
-- Marks partner as available again
-- Publishes **`order.delivered`**
+Use a few domain topics, not one topic per order or user:
 
-**Multiple consumers react:**
+```text
+payment-events
+order-events
+delivery-events
+notification-retry
+notification-dead-letter
+```
 
-→ **Notification Service** sends: *"Your order has been delivered! Rate your experience."*
+Partition order events by `order_id`:
 
-→ **Tracking Service** closes the WebSocket connection. GPS updates stop.
+```text
+partition key = order_id
+```
 
-→ **Invoice Service** (background job) generates a PDF receipt → uploads to S3 → emails to user.
+That keeps one order's events in order while different orders process in parallel.
 
----
-
-### Kafka topics summary
-
-| Topic | Published by | Consumed by |
+| Event | Publisher | Important consumers |
 |---|---|---|
-| `order.payment_confirmed` | Order Service | Restaurant Service, Notification Service |
-| `order.confirmed` | Restaurant Service | Delivery Service, Notification Service |
-| `order.partner_assigned` | Delivery Service | (internal tracking) |
-| `order.preparing` | Restaurant Service | Notification Service |
-| `order.out_for_delivery` | Delivery Service | Notification Service, Tracking Service |
-| `order.delivered` | Delivery Service | Notification Service, Tracking Service, Invoice Service |
-| `order.cancelled` | Order/Restaurant/Delivery Service | Notification Service, Refund Service |
+| `payment.succeeded` | Payment Service | Order Service |
+| `payment.failed` | Payment Service | Order Service |
+| `order.payment_confirmed` | Order Service | Restaurant, Notification |
+| `order.payment_failed` | Order Service | Notification |
+| `order.confirmed` | Restaurant Service | Delivery, Notification |
+| `order.preparing` | Restaurant Service | Notification |
+| `order.partner_assigned` | Delivery Service | Notification, Tracking |
+| `order.out_for_delivery` | Delivery Service | Notification, Tracking |
+| `order.delivered` | Delivery Service | Notification, Invoice |
+| `order.cancelled` | Order/Restaurant Service | Refund, Notification |
+| `refund.requested` | Refund Service | Payment Service |
+| `refund.succeeded` | Payment Service | Order, Notification |
 
-### Why this Kafka design is powerful
-
-- **No service knows about other services.** The Order Service doesn't know Notification Service exists — it just publishes events. New consumers can be added (e.g. analytics, fraud detection) without touching existing services.
-- **Failures are isolated.** If the Notification Service goes down, orders still process. When it recovers, it replays events from its last committed offset and catches up.
-- **Events are the audit log.** Every state transition is a Kafka event. You can replay the full history of any order by replaying its events in order.
-- **Retry is built in.** Kafka retains messages for days. A failed consumer just resets its offset and retries — no message is lost.
-
----
-
-### Order State Machine
-
-![Order State Machine](./images/orders-states.svg)
-
-#### How each state transition works
-
-**PLACED**
-Order row created in PostgreSQL. Cart is snapshotted into `order_items`. The Payment Service is called synchronously right after. This state is very short-lived — it lasts only as long as the payment gateway call takes (< 2s).
-
-**PLACED → PAYMENT_CONFIRMED**
-Payment gateway returns success. Order Service updates the DB row to `PAYMENT_CONFIRMED` and publishes `order.payment_confirmed` to Kafka. The client gets `200 OK` here. Everything from this point is async.
-
-**PLACED → FAILED**
-Payment gateway returns failure (insufficient funds, card declined). Order stays in DB for audit, status set to `FAILED`. No Kafka events downstream. User is shown an error and can retry with a different card.
-
-**PAYMENT_CONFIRMED → CONFIRMED**
-Restaurant Service receives the `order.payment_confirmed` Kafka event and forwards the order to the restaurant POS. Restaurant operator taps "Accept". Restaurant Service publishes `order.confirmed`. If no response within 3 minutes → auto-cancel and refund.
-
-**CONFIRMED → PREPARING**
-Restaurant taps "Start Cooking". Restaurant Service publishes `order.preparing`. Notification Service sends "Your food is being prepared" push to user.
-
-**PREPARING → OUT_FOR_DELIVERY**
-Delivery partner arrives at restaurant and taps "Picked Up" in their app. Delivery Service publishes `order.out_for_delivery`. Tracking Service starts pushing live GPS to customer's WebSocket.
-
-**OUT_FOR_DELIVERY → DELIVERED**
-Partner taps "Delivered" (or OTP confirmed). Delivery Service publishes `order.delivered`. Invoice generation job is triggered. Partner is marked available again for new assignments.
-
-**→ CANCELLED**
-Can be triggered by: user cancellation (before CONFIRMED), restaurant timeout, or partner going offline during delivery. In all cases, `order.cancelled` is published → Refund Service initiates reversal to original payment method.
-
-> **Key rule**: The DB is updated first, Kafka event published second. If Kafka publish fails after DB write, an **outbox pattern** guarantees the event is eventually published — a background poller reads the `outbox` table and retries.
+Every consumer must be idempotent because Kafka can deliver an event more than once.
 
 ---
 
-### Order Placement Flow (Sync vs Async)
+## 8. Preventing Double Charges
 
-![Order Placement Flow](./images/orders-placement.svg)
+The client generates one UUID when the user taps "Place Order":
 
-#### How the order placement flow works — step by step
-
-**1. Client → Order Service**
-User taps "Place Order". The client sends `POST /order` with the cart contents and a client-generated `idempotency_key` (UUID). The idempotency key is the client's guard against accidental double-taps — if the same key arrives twice, the second request returns the cached result without processing.
-
-**2. Order Service — Validate**
-Before touching payment, the Order Service:
-- Checks items are still available (menu items can go out of stock)
-- Recalculates the price server-side (never trust client-sent prices)
-- Checks the restaurant is still accepting orders (open/closed status)
-If any check fails → 400 error returned, no order created.
-
-**3. Order Service — Create Order Row**
-```sql
-INSERT INTO orders (id, user_id, restaurant_id, status, idempotency_key, total, created_at)
-VALUES (snowflakeId, userId, restaurantId, 'PLACED', key, total, NOW())
+```text
+idempotency_key = 83f1...
 ```
-Also inserts rows into `order_items` (one per cart item). Status is `PLACED`. This write happens before payment — so we have a record even if payment fails.
 
-**4. Order Service → Payment Service (SYNC)**
-This is the only synchronous service-to-service call in the entire system. It must be sync because the user is waiting to know if their card was charged. The Order Service calls the Payment Service with `{ order_id, amount, card_token, idempotency_key }`.
+The same key is used for:
 
-The Payment Service calls Stripe/Razorpay, waits for the gateway response, and returns success or failure. This is the slowest part of the flow (~500ms–1.5s depending on the gateway).
+```text
+Client → Order Service
+Order Service → Payment Service
+Payment Service → Stripe/Razorpay
+```
 
-**5. Payment confirmed — DB update + Kafka publish**
-On success, Order Service:
-- Updates `orders.status = 'PAYMENT_CONFIRMED'` in PostgreSQL
-- Writes a row to the `outbox` table: `{ event: 'order.payment_confirmed', payload: {...} }`
-- A background outbox poller reads this and publishes to Kafka (guarantees delivery even if Kafka is briefly down)
+If the request is retried:
 
-**6. Order Service → Client: 200 OK**
-The client gets the response here. The user sees "Order placed!" on their screen. Everything from this point — restaurant confirmation, delivery assignment, notifications — happens in the background and is pushed to the client via WebSocket/push notifications.
+```text
+Order Service finds the existing order
+Payment Service finds the existing transaction
+Gateway returns the original charge result
+```
 
-**7. Restaurant Service (ASYNC)**
-Consumes `order.payment_confirmed` from Kafka. Sends the order details to the restaurant's POS (Point of Sale) system. Starts a 3-minute acceptance timer.
+Use unique constraints:
 
-**8. Notification Service (ASYNC)**
-Consumes every order event from Kafka. On `order.payment_confirmed` → sends "We got your order!" push notification. On `order.confirmed` → sends "Restaurant confirmed your order!". Each notification is independent and retried if it fails.
+```text
+orders.idempotency_key                       UNIQUE
+payment_transactions(order_id, operation)   UNIQUE
+```
+
+> **Interview sentence:** "Retries are expected; idempotency makes them harmless."
 
 ---
 
-### Idempotency (Prevent Double Charge)
+## 9. Restaurant and Delivery Flow
+
+```text
+order.payment_confirmed
+        ↓
+Restaurant receives order
+        ↓
+Restaurant accepts
+        ↓
+order.confirmed
+        ↓
+Delivery Service finds nearby partner
+        ↓
+order.partner_assigned
+        ↓
+Partner picks up
+        ↓
+order.out_for_delivery
+        ↓
+Delivered
+        ↓
+order.delivered
 ```
-Client generates UUID idempotency_key before calling /place-order
 
-Server:
-  SELECT * FROM orders WHERE idempotency_key = ?
-  Found? → return cached response (not a new order)
-  Not found? → process + store key with response
+Restaurant Service and Delivery Service never need to call each other directly.
 
-Also pass idempotency_key to Stripe/Razorpay → they deduplicate charges on their end
+If the restaurant does not accept within three minutes:
+
+```text
+Order timeout
+   → order.cancelled
+   → refund.requested
+   → Payment Service refunds
+   → refund.succeeded
 ```
-
-#### Why idempotency matters here
-
-Network failures are common on mobile. If the user taps "Place Order" and the response never arrives (connection drops), the app retries. Without idempotency, that retry creates a second order and charges the card again. With the `idempotency_key`:
-
-- The **client generates** a UUID when the user taps "Place Order" — before the first request goes out
-- On retry, the **same UUID** is sent again
-- The Order Service checks: `SELECT * FROM orders WHERE idempotency_key = ?`
-  - Found → return the original response immediately, no processing
-  - Not found → process normally and save the key + response
-- The key is also forwarded to the payment gateway — Stripe/Razorpay have their own idempotency layer, so even if the Order Service crashes mid-payment, a retry to the gateway with the same key returns the original charge result, not a second charge
-
-**Storage**: `idempotency_key` is a unique-indexed column on the `orders` table. No separate table needed.
 
 ---
 
-### Cart Design (Why Redis, Not DB?)
-```
-Redis Hash: cart:{userId} → {itemId: quantity, ...}
-TTL: 24 hours
+## 10. Real-Time Tracking
 
-On order placement:
-  HGETALL cart:{userId} → snapshot into order_items table
-  DEL cart:{userId}
+Partner app sends GPS every five seconds:
 
-Why not DB?
-  Cart changes on every add/remove/quantity-change
-  High-frequency writes for ephemeral data = wasteful DB pressure
-  Redis: sub-millisecond, no schema, natural TTL
+```text
+location:{partnerId} → {lat, lng, timestamp}
 ```
 
-#### How cart operations work in Redis
+Store the latest location in Redis because it changes frequently and old points are usually not needed.
 
-Every cart interaction maps to a single Redis command:
+```mermaid
+flowchart LR
+    P([Partner App]) -->|GPS every 5 sec| T[Tracking Service]
+    T --> R[(Redis)]
+    R --> W[WebSocket Server]
+    W --> C([Customer App])
 
+    style P fill:#1f6feb,color:#fff
+    style C fill:#1f6feb,color:#fff
+    style R fill:#f85149,color:#fff
 ```
-Add item      : HSET cart:9923711  item:42  2         → set item 42 qty = 2
-Remove item   : HDEL cart:9923711  item:42
-Change qty    : HSET cart:9923711  item:42  5         → overwrite qty
-View cart     : HGETALL cart:9923711                  → { item:42: 5, item:77: 1, ... }
-Abandon cart  : TTL expires after 24h → key deleted automatically
-```
 
-The Redis hash `cart:{userId}` maps `itemId → quantity`. The entire cart is one Redis key — one `HGETALL` fetches everything.
-
-**On order placement**, the Order Service:
-1. Calls `HGETALL cart:{userId}` to snapshot the cart
-2. Inserts rows into `order_items` in PostgreSQL (permanent record)
-3. Calls `DEL cart:{userId}` to clear the cart
-4. Refreshes the client's cart UI to empty
-
-**What if the user has the cart open on two devices?**
-Both read from the same Redis key. Writes are last-write-wins (fine for cart — no financial consequence).
+Kafka is not the best path for every GPS update. These updates are temporary and only the newest location matters.
 
 ---
 
-### Real-time Tracking Architecture
+## 11. Cart
 
-![Real-time Tracking](./images/orders-tracking.svg)
+Use Redis:
 
-#### How real-time tracking works — step by step
-
-**1. Partner App → Delivery Service (GPS ping)**
-The delivery partner's app sends a GPS ping every 5 seconds:
+```text
+cart:{userId} → item and quantity map
+TTL           → 24 hours
 ```
-POST /location  { partner_id: 7712, lat: 12.9716, lng: 77.5946, timestamp: ... }
+
+When placing an order:
+
+```text
+1. Read cart from Redis
+2. Recalculate prices server-side
+3. Copy final items into order_items
+4. Delete cart after successful placement
 ```
-At peak — 1M active deliveries × 1 ping/5s = **200,000 writes/second**. This must be extremely fast to handle.
 
-**2. Delivery Service → Redis**
-The Delivery Service writes the location to Redis:
-```
-SET location:7712  "12.9716,77.5946"  EX 10
-```
-- Key: `location:{partnerId}` — one key per active partner
-- Value: `"lat,lng"` string (or a small JSON)
-- `EX 10`: key expires in 10 seconds — if the partner goes offline, the key disappears automatically. No stale location data.
-
-Why Redis and not PostgreSQL? At 200k writes/sec, PostgreSQL would need massive connection pooling and sharding. Redis handles this trivially — it's an in-memory key-value store built for exactly this access pattern.
-
-**3. Tracking Service → Redis (poll)**
-The Tracking Service polls `GET location:{partnerId}` every 2 seconds for each active delivery it's tracking. It compares the new location with the last sent location — if it changed, it pushes to the customer's WebSocket.
-
-**4. Tracking Service → Customer App (WebSocket push)**
-The customer's app holds an open WebSocket connection to the Tracking Service while the order is `OUT_FOR_DELIVERY`. The Tracking Service pushes location updates as JSON:
-```json
-{ "partner_id": 7712, "lat": 12.9718, "lng": 77.5950, "eta_minutes": 4 }
-```
-The app updates the map marker in real time.
-
-**Why WebSocket and not HTTP polling?**
-If 1M customers each polled every 2 seconds, that's 500k HTTP requests/sec just for location updates — each with TCP handshake, auth, headers. WebSocket keeps the connection open: zero handshake overhead per update. One persistent connection per customer instead of 500k requests/sec.
-
-**What happens when the order is delivered?**
-The Tracking Service closes the WebSocket connection. The `location:{partnerId}` Redis key is deleted (or expires). The partner is marked available in the Delivery Service.
+The order contains a permanent snapshot. The cart remains temporary.
 
 ---
 
-### Background Jobs
+## 12. Background Jobs
+
 | Job | Trigger | Action |
 |---|---|---|
-| Order timeout | Cron every 1 min | Cancel orders in PLACED > 5 min (payment never came) |
-| Restaurant timeout | Cron every 1 min | Cancel PAYMENT_CONFIRMED unaccepted > 3 min |
-| Payment retry | Failed payment event | Retry up to 3× with exponential backoff |
-| Partner re-assignment | Partner offline event | Find new delivery partner |
-| Invoice generation | order.delivered event | Generate PDF → S3 → email to user |
-| Refund processing | order.cancelled event | Call Payment Gateway refund API async |
+| Payment reconciliation | Scheduled + gateway webhooks | Repair missing payment results |
+| Restaurant timeout | Order remained unaccepted for 3 minutes | Cancel and request refund |
+| Payment retry | Technical failure only | Retry with backoff and same idempotency key |
+| Partner reassignment | Partner unavailable | Find another partner |
+| Invoice generation | `order.delivered` | Generate PDF and store in S3 |
+| Refund processing | `order.cancelled` | Ask Payment Service to reverse payment |
+
+Do not automatically retry card declines such as insufficient funds. Retry only technical failures.
 
 ---
 
-## Step 5: Key Design Decisions
+## 13. What to Draw in an Interview
 
-| Decision | Choice | Alternative | Why |
-|---|---|---|---|
-| Service communication | Kafka (async) | Sync REST between services | Decoupled; one failure doesn't cascade |
-| Order state | PostgreSQL | NoSQL | ACID for financial state machine |
-| Cart | Redis | PostgreSQL | Ephemeral, high-frequency, natural TTL |
-| Payment call | Synchronous | Async | User must know charge result immediately |
-| Real-time tracking | WebSocket + Redis | Polling | Push cheaper at scale; polling = thundering herd |
+For a 45-minute interview:
+
+1. Requirements — 5 minutes
+2. Architecture diagram — 8 minutes
+3. Payment flow — 10 minutes
+4. Order state machine — 7 minutes
+5. Idempotency + outbox — 8 minutes
+6. Tracking or scaling deep dive — remaining time
+
+### Say these lines
+
+- "Order Service owns the order; Payment Service owns the charge."
+- "Payment is synchronous for UX but also emits a durable event."
+- "The outbox prevents a successful charge from losing its Kafka event."
+- "Every payment request carries the same idempotency key through all layers."
+- "Kafka is partitioned by order ID so one order stays ordered."
+- "GPS goes through Redis/WebSocket because only the latest value matters."
+
+### Skip unless asked
+
+- Exact database columns
+- Kafka broker counts
+- Every notification template
+- Detailed restaurant POS integration
+- Exact geospatial algorithm
 
 ---
 
-## Common Interview Follow-ups
+## Common Interview Questions
 
-**Q: What if Kafka goes down during order placement?**
-Payment is sync and committed to DB before Kafka publish. Kafka failure only delays downstream (notifications, delivery). Order and payment are safe. Use outbox pattern for guaranteed Kafka delivery.
+**Why doesn't Payment Service only use Kafka?**  
+It could, but the API would return `202 Processing` and the user would wait for a later update. The hybrid design gives immediate feedback while keeping Kafka durability.
 
-**Q: What if the restaurant never responds?**
-Cron job scans PAYMENT_CONFIRMED orders every 1 min. Orders unaccepted > 3 min → auto-cancel → refund Kafka event → customer notified.
+**Why doesn't Order Service publish the payment result?**  
+Because Payment Service owns the payment transaction. Order Service publishes the consequence for its own domain: `order.payment_confirmed`.
 
-**Q: How do you handle a 10× traffic spike during a promo?**
-API Gateway rate limits. Kafka absorbs write spikes (consumers process at steady rate). Stateless Order/Restaurant services scale horizontally. Redis handles cart and tracking load.
+**What if the card is charged but the HTTP response is lost?**  
+Payment Service's outbox still publishes `payment.succeeded`. Order Service consumes it and repairs the order.
+
+**What if Kafka is down?**  
+Outbox rows remain unpublished and retry later. Payment and order state are safe in their databases.
+
+**What if Kafka delivers the same event twice?**  
+Consumers track the event ID or enforce a unique state transition, making processing idempotent.
+
+**What if Order Service consumes `payment.succeeded` after it already handled the HTTP success?**  
+The HTTP response is only for UX. The durable event performs an idempotent state transition, so processing it again changes nothing.
+
+**Why not call Restaurant Service synchronously after payment?**  
+Restaurant delays should not keep the user's payment request open. Kafka isolates failures and allows retries.
+
+**How is a refund handled?**  
+Cancellation publishes `refund.requested`; Payment Service performs the reversal and publishes `refund.succeeded` or `refund.failed`.
