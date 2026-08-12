@@ -368,6 +368,29 @@ Offsets committed to Kafka (or external store)
 Can reset offset to replay messages
 ```
 
+### When Consumer Offsets Become Relevant
+
+Offsets matter whenever Kafka must determine where a consumer group should continue
+reading a partition:
+
+* **Consumer or server crash:** A replacement consumer resumes from the last committed
+  offset. Records processed but not committed may be processed again.
+* **Application restart or deployment:** The restarted consumer continues from its
+  committed offset instead of reading the topic from the beginning.
+* **Consumer-group rebalance:** When consumers join, leave, or fail, Kafka reassigns
+  partitions and their new owners resume from the group's committed offsets.
+* **Scaling consumers:** New consumers receive partitions, not individual records, and
+  start from the offsets already recorded for those partitions.
+* **Retry and failure recovery:** Commit timing determines whether a failed record is
+  retried, duplicated, or potentially lost.
+* **Replay or reprocessing:** Resetting offsets backward lets a consumer group process
+  retained historical records again.
+* **Monitoring consumer lag:** The difference between the latest partition offset and
+  the group's committed offset shows how far processing is behind.
+
+Offsets are maintained **per consumer group and per partition**. They do not represent
+one global position for an entire topic.
+
 ## Message Structure
 
 Every unit of data in Kafka is called a **record** (or message/event). The **Key** is optional but critical — it controls which partition the message lands in (same key always goes to same partition), enabling ordering guarantees per entity. The **Value** is the actual payload and is just raw bytes — Kafka doesn't care about the format (JSON, Avro, Protobuf, etc.). The **Offset** and **Partition** fields are assigned by Kafka itself, not the producer.
