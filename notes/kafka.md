@@ -474,36 +474,50 @@ AUTO-COMMIT (enable.auto.commit=true):
 ┌──────────────────────────────────────┐
 │ Read msg → Process msg → (auto commit every 5s) │
 └──────────────────────────────────────┘
-⚠️  Risk: If crash before auto-commit, messages re-processed
+Server crash:
+- Crash before auto-commit → message is processed again
+- Offset committed before processing finishes → message may be lost
+Use when: Occasional duplicates or loss are acceptable and simplicity is preferred
 
 
 MANUAL COMMIT - Sync:
 ┌──────────────────────────────────────┐
 │ Read msg → Process msg → Commit ✓    │
 └──────────────────────────────────────┘
-✓ No message loss, but slower
+Server crash:
+- Crash before commit → message is processed again
+- Crash after commit → processing is already complete
+Use when: Processing must not be lost and lower throughput is acceptable
 
 
 MANUAL COMMIT - Async:
 ┌──────────────────────────────────────┐
 │ Read msg → Process msg → Commit (async) │
 └──────────────────────────────────────┘
-⚠️  Faster, but may duplicate if crash before commit completes
+Server crash:
+- Crash before the asynchronous commit completes → message may be processed again
+Use when: Higher throughput is important and consumers are idempotent
 
 
 AT-LEAST-ONCE (most common):
 Read → Process → Commit
-If crash before commit: message re-processed (duplicate)
+Server crash before commit: message is processed again
+Use when: Losing a message is unacceptable and duplicates can be handled
 
 
 AT-MOST-ONCE (rare):
 Read → Commit → Process
-If crash during process: message lost
+Server crash during processing: message may be lost because its offset is committed
+Use when: Duplicates are unacceptable but occasional message loss is acceptable
 
 
 EXACTLY-ONCE (complex):
 Use Kafka transactions + idempotent producer
 Requires additional coordination
+Server crash: Kafka aborts an incomplete transaction and retries the operation
+Use when: Consuming and producing within Kafka must be atomic
+Limitation: It does not guarantee exactly-once behavior for external side effects,
+such as sending an email or charging a payment card
 ```
 
 ### Kafka Is a Durable Log, Not Just a Queue
