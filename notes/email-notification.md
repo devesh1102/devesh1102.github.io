@@ -167,6 +167,73 @@ The reliability design does not depend on Kafka specifically. It depends on:
 * Idempotent processing
 * A persistent delivery ledger
 
+### Kafka Topics and Offsets for This Design
+
+If Kafka is selected, use separate topics so bulk traffic cannot block urgent traffic:
+
+| Topic | Purpose |
+|---|---|
+| `email.urgent` | Password resets, fraud alerts, security notifications |
+| `email.standard` | Normal transactional notifications |
+| `email.bulk` | Billing statements and eventual bulk delivery |
+| `email.retry.1m` | First delayed retry |
+| `email.retry.10m` | Longer delayed retry |
+| `email.retry.1h` | Extended provider recovery |
+| `email.dlq` | Records that exceeded the retry limit |
+
+Use a separate consumer group for each worker pool:
+
+```text
+email-urgent-executors   → consumes email.urgent
+email-standard-executors → consumes email.standard
+email-bulk-executors     → consumes email.bulk
+```
+
+Use **manual offset commits with at-least-once processing**:
+
+```text
+Poll record
+→ claim email_id in delivery ledger
+→ send to provider
+→ persist result
+→ commit Kafka offset
+```
+
+Why this order:
+
+* Crash before the result is saved: Kafka redelivers the record.
+* Crash after saving but before committing: Kafka redelivers it, but the delivery
+  ledger detects the completed email and prevents another normal send.
+* Commit before sending: unsafe, because a crash can permanently lose the email.
+
+Recommended consumer settings:
+
+```properties
+enable.auto.commit=false
+isolation.level=read_committed
+auto.offset.reset=earliest
+```
+
+`auto.offset.reset=earliest` applies only when the consumer group has no valid committed
+offset. During ordinary restarts, the consumer resumes from its committed offset.
+
+Recommended producer and topic durability settings:
+
+```properties
+acks=all
+enable.idempotence=true
+replication.factor=3
+min.insync.replicas=2
+unclean.leader.election.enable=false
+```
+
+Partition using a stable key such as `tenant_id + recipient_hash`. This distributes
+traffic while keeping emails for the same tenant and recipient ordered within a
+partition. Ordering is guaranteed only inside one partition.
+
+Monitor consumer lag separately for urgent and bulk consumer groups. Urgent lag should
+remain near zero; bulk lag may grow temporarily during provider degradation.
+
 ---
 
 ## 7. Email Executor and Crash Recovery
