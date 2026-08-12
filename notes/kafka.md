@@ -619,6 +619,174 @@ executor crashes before saving the response. Reconcile through the provider's
 idempotency key or status API when available. Otherwise, an at-least-once design must
 prefer a rare duplicate over losing the email.
 
+## Retry Topics and Dead-Letter Queues
+
+Kafka does **not** provide a built-in delayed retry queue or dead-letter queue. These are
+application-level patterns implemented with additional Kafka topics, consumers, record
+headers, and monitoring.
+
+### Why Not Retry Forever in the Main Consumer?
+
+Suppose offset 25 repeatedly fails:
+
+```text
+Partition 0:
+24 ✓ → 25 fails → 26 waiting → 27 waiting → 28 waiting
+```
+
+Continuously retrying offset 25 inside the main consumer blocks every later record in
+that partition. It can also exceed `max.poll.interval.ms`, causing Kafka to rebalance the
+consumer group and redeliver records.
+
+For a brief network error, one or two immediate retries may be reasonable. For longer
+delays, publish the failed record to a retry topic and allow the main consumer to
+continue.
+
+### Retry Topic Topology
+
+Use separate topics for increasing backoff periods:
+
+```text
+orders
+  │
+  ├── success → commit original offset
+  │
+  └── transient failure
+         ↓
+     orders.retry.1m
+         ↓ still failing
+     orders.retry.10m
+         ↓ still failing
+     orders.retry.1h
+         ↓ retry limit exceeded
+     orders.dlq
+```
+
+Each retry consumer waits until the record's next-attempt time and then republishes it
+to the main topic or directly attempts the operation. Kafka itself does not delay record
+visibility, so the consumer or a scheduling layer must enforce the delay.
+
+Useful retry headers:
+
+```text
+event-id:              order-123
+original-topic:        orders
+original-partition:    4
+original-offset:       9821
+attempt-count:         3
+first-failed-at:       2026-08-12T12:00:00Z
+next-attempt-at:       2026-08-12T13:00:00Z
+last-error-code:       PROVIDER_TIMEOUT
+last-error-message:    request timed out
+```
+
+Use exponential backoff with jitter:
+
+```text
+delay = min(baseDelay × 2^attempt, maxDelay) + randomJitter
+```
+
+Jitter prevents thousands of failed records from retrying simultaneously when a
+dependency recovers.
+
+### Safe Offset Handling
+
+Never commit the original offset before the retry record is durably written:
+
+```text
+Unsafe:
+Commit original offset → crash → retry record was never published → message lost
+
+Safe:
+Publish retry record with acks=all
+→ receive broker acknowledgment
+→ commit original offset
+```
+
+For consume-transform-produce workflows entirely inside Kafka, a Kafka transaction can
+atomically publish the retry record and commit the consumed offset:
+
+```text
+begin transaction
+→ publish to retry topic
+→ send consumed offset to transaction
+→ commit transaction
+```
+
+External side effects such as email delivery or payment processing still require an
+idempotency key and a durable processing ledger.
+
+### Retryable vs Permanent Failures
+
+| Failure | Destination |
+|---|---|
+| Network timeout, HTTP 429, dependency 5xx | Retry topic |
+| Temporary database outage | Retry topic |
+| Invalid schema or malformed payload | DLQ |
+| Invalid email address or unsupported operation | DLQ or permanent-failure topic |
+| Authentication/configuration failure | Pause consumer and alert; retries alone may worsen the incident |
+| Retry limit or maximum age exceeded | DLQ |
+
+Do not retry every exception blindly. Classify errors explicitly so permanent failures
+do not create infinite retry storms.
+
+### Dead-Letter Topic
+
+A dead-letter topic stores records that automated processing cannot safely complete:
+
+```text
+orders.dlq
+```
+
+The DLQ record should preserve the original key and payload plus failure metadata. Use a
+longer retention period than normal retry topics so operators have time to investigate.
+
+A DLQ is not a place to silently forget messages. Monitor:
+
+* DLQ arrival rate
+* Oldest unresolved record
+* Failures by error code and producer version
+* Retry volume and success rate
+* Records approaching maximum retry age
+
+Alert on unexpected DLQ growth.
+
+### DLQ Replay
+
+After fixing the underlying problem:
+
+```text
+DLQ → validation/replay tool → original topic
+```
+
+The replay tool should:
+
+1. Select records by error type, time range, or event ID.
+2. Validate or transform outdated payloads.
+3. Preserve the original event ID for idempotency.
+4. Publish with a new replay ID and audit metadata.
+5. Rate-limit replay so downstream services are not overloaded.
+6. Record who initiated the replay and its outcome.
+
+Never replay an entire DLQ blindly. Some records represent permanent business errors
+and will fail again.
+
+### Ordering Tradeoff
+
+Moving a failed record to a retry topic allows later records from the original partition
+to continue. This improves availability but can break strict ordering:
+
+```text
+Original order: A → B → C
+B fails and moves to retry
+Observed processing: A → C → B
+```
+
+If ordering for the same entity is mandatory, either pause that entity's processing,
+route it to a per-key recovery flow, or make later operations tolerant of missing
+earlier state. Retry-topic designs must choose between strict ordering and avoiding
+partition blockage.
+
 ## Key Configurations
 
 ### Producer Configs:
