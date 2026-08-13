@@ -490,58 +490,91 @@ Producer ────────▶ Leader ────────▶ Follower
 ↓ Slowest, no message loss (durable)
 ```
 
-## Consumer Offset Commit Strategies
+## Kafka Offsets and Delivery Semantics
 
-```
-AUTO-COMMIT (enable.auto.commit=true):
-┌──────────────────────────────────────┐
-│ Read msg → Process msg → (auto commit every 5s) │
-└──────────────────────────────────────┘
-Server crash:
-- Crash before auto-commit → message is processed again
-- Offset committed before processing finishes → message may be lost
-Use when: Occasional duplicates or loss are acceptable and simplicity is preferred
+Kafka's delivery semantics — **at-least-once, at-most-once, and exactly-once** —
+depend primarily on when the consumer records its progress relative to processing a
+message.
 
+An **offset** is a record's sequential position within a partition. A consumer group
+commits the offset of the **next record it should read**. For example, after successfully
+processing record 100, it commits offset 101.
 
-MANUAL COMMIT - Sync:
-┌──────────────────────────────────────┐
-│ Read msg → Process msg → Commit ✓    │
-└──────────────────────────────────────┘
-Server crash:
-- Crash before commit → message is processed again
-- Crash after commit → processing is already complete
-Use when: Processing must not be lost and lower throughput is acceptable
+### 1. At-Least-Once Delivery
 
+**Core rule:** Process first, then commit the offset.
 
-MANUAL COMMIT - Async:
-┌──────────────────────────────────────┐
-│ Read msg → Process msg → Commit (async) │
-└──────────────────────────────────────┘
-Server crash:
-- Crash before the asynchronous commit completes → message may be processed again
-Use when: Higher throughput is important and consumers are idempotent
+**Guarantee:** A successfully acknowledged message is not skipped, but a message may be
+processed more than once.
 
+1. The consumer reads record 100.
+2. It performs the business operation, such as writing to a database.
+3. After processing succeeds, it commits offset 101.
 
-AT-LEAST-ONCE (most common):
-Read → Process → Commit
-Server crash before commit: message is processed again
-Use when: Losing a message is unacceptable and duplicates can be handled
+If the consumer crashes after step 2 but before step 3, Kafka still has the earlier
+committed position. After restart or rebalance, record 100 is read and processed again.
+Consumers therefore need **idempotent processing**, commonly implemented with a database
+uniqueness constraint, an idempotency key, or a transactional inbox.
 
+> Kafka commonly provides at-least-once processing when offsets are committed only after
+> successful processing. Although `enable.auto.commit=true` is the client default,
+> auto-commit is driven by calls to `poll()` and a timer; it is not automatically
+> coordinated with completion of application processing.
 
-AT-MOST-ONCE (rare):
-Read → Commit → Process
-Server crash during processing: message may be lost because its offset is committed
-Use when: Duplicates are unacceptable but occasional message loss is acceptable
+### 2. At-Most-Once Delivery
 
+**Core rule:** Commit the offset before processing.
 
-EXACTLY-ONCE (complex):
-Use Kafka transactions + idempotent producer
-Requires additional coordination
-Server crash: Kafka aborts an incomplete transaction and retries the operation
-Use when: Consuming and producing within Kafka must be atomic
-Limitation: It does not guarantee exactly-once behavior for external side effects,
-such as sending an email or charging a payment card
-```
+**Guarantee:** A message is processed no more than once, but it may be lost from the
+application's perspective.
+
+1. The consumer reads record 100.
+2. It commits offset 101.
+3. It performs the business operation.
+
+If the consumer crashes during step 3, Kafka already considers record 100 consumed. The
+replacement consumer resumes at offset 101, so record 100 is not retried even though its
+processing did not complete.
+
+This behavior should be implemented deliberately by committing before processing. A
+short auto-commit interval alone is not a precise or reliable way to guarantee
+at-most-once behavior.
+
+### 3. Exactly-Once Processing
+
+**Core rule:** Make the output and consumed offset visible atomically.
+
+#### Kafka-to-Kafka
+
+Kafka can provide exactly-once semantics when consuming from Kafka, processing, and
+producing back to Kafka:
+
+1. Begin a producer transaction.
+2. Write the output records.
+3. Add the consumed offsets with `sendOffsetsToTransaction()`.
+4. Commit the transaction.
+
+The output records and offsets either commit together or abort together. Downstream
+consumers must use `isolation.level=read_committed` to avoid reading aborted
+transactional records. Kafka Streams provides this model through exactly-once processing
+mode.
+
+#### Kafka-to-External Database
+
+Kafka transactions cannot atomically include an independent database transaction.
+Practical options are:
+
+* Make the database write idempotent using a message ID and a unique constraint, then
+  commit the Kafka offset after the database transaction succeeds.
+* Store the processed result and an inbox/deduplication record in the same database
+  transaction.
+* Store the consumer position in the same database transaction as the result only when
+  the application also restores and manages its read position from that database. This
+  replaces normal Kafka group-offset management and requires careful rebalance handling.
+
+For external side effects, the realistic guarantee is usually **at-least-once delivery
+with effectively-once business outcomes through idempotency**, not native end-to-end
+Kafka exactly-once semantics.
 
 ### Kafka Is a Durable Log, Not Just a Queue
 
@@ -559,10 +592,10 @@ Record:  Email A   Email B   Email C
                     Consumer group's next position
 ```
 
-If the consumer commits offset `2`, it continues from the following offset. If it
-crashes before committing, another consumer in the group can read the uncommitted
-record again. This enables recovery and replay, but also means consumers must tolerate
-duplicate processing.
+If the consumer commits offset `2`, record `2` is the next record it reads. If it crashes
+before committing the next position, another consumer in the group can read the
+uncommitted record again. This enables recovery and replay, but also means consumers
+must tolerate duplicate processing.
 
 Within a consumer group, Kafka assigns each partition to only one consumer at a time:
 
