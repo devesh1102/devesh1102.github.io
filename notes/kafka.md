@@ -32,22 +32,28 @@ Apache Kafka is a distributed event streaming platform designed for high-through
 ## Common Use Cases
 
 ### 1. Decoupling Microservices (Spike Handling)
-**Problem**: Direct service-to-service calls fail under traffic spikes. **Solution**: Producer publishes to Kafka; consumer reads at its own pace. Kafka buffers millions of messages, absorbing spikes while consumers scale independently.
+**Problem**: Direct service-to-service calls fail under traffic spikes. <br>
+**Solution**: Producer publishes to Kafka; consumer reads at its own pace. Kafka buffers millions of messages, absorbing spikes while consumers scale independently.<br>
+**Example** when there is too much writes happen at once and service need to handle that.<br>
+Also when we want to offer premier services to some customer and non premium user we use diff kafka topics for them just after the load balancer
 
 ### 2. Event Sourcing & Audit Logs
-**Problem**: Need immutable record of all state changes. **Solution**: Every state change becomes an event appended to Kafka. Replaying events from offset 0 reconstructs system state. Essential for compliance and debugging.
+**Problem**: Need immutable record of all state changes. <br>**Solution**: Every state change becomes an event appended to Kafka. Replaying events from offset 0 reconstructs system state. Essential for compliance and debugging.<br>
+
 
 ### 3. Log Aggregation
 **Problem**: Logs spread across hundreds of services; searching is slow. **Solution**: Each service writes logs to a single Kafka topic. Centralized consumers ship logs to Elasticsearch, S3, or a data warehouse.
 
 ### 4. Stream Processing (Real-time Analytics)
-**Problem**: Need real-time insights (e.g., top products, anomalies). **Solution**: Kafka Streams or Flink consumes from topics, applies transformations (windowing, joins, aggregations), and outputs results to data stores or dashboards.
+**Problem**: Need real-time insights (e.g., top products, anomalies).<br> **Solution**: Kafka Streams or Flink consumes from topics, applies transformations (windowing, joins, aggregations), and outputs results to data stores or dashboards.
 
 ### 5. Change Data Capture (CDC)
-**Problem**: Database changes need to sync to multiple systems. **Solution**: Debezium captures database write-ahead logs and streams changes to Kafka. Other systems consume and apply changes in near real-time.
+**Problem**: Database changes need to sync to multiple systems.<br> **Solution**: Debezium captures database write-ahead logs and streams changes to Kafka. Other systems consume and apply changes in near real-time.<br>
+**Example**: This happens in case of payment like service where we need to take care and store the changes that happen in the db. there we store every change in the db in a kafka then its written in a S3 blob
 
 ### 6. Distributed Transaction Coordination (Saga Pattern)
-**Problem**: Multi-service transactions can fail mid-way. **Solution**: Each service publishes events; a saga orchestrator or choreographer consumes events and coordinates compensating transactions via Kafka topics.
+**Problem**: Multi-service transactions can fail mid-way. <br>**Solution**: Each service publishes events; a saga orchestrator or choreographer consumes events and coordinates compensating transactions via Kafka topics.<br>
+**Example**: In case or ordering service where we have multiple steps and each step completion and error will correspond to different step being addressed 
 
 ### 7. Real-time Dashboards & Metrics
 **Problem**: Metrics arrive slowly; dashboards lag. **Solution**: Applications push metrics to Kafka. Stream processors aggregate by time window (1s, 1m) and emit to in-memory stores (Redis) for instant dashboard queries.
