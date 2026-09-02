@@ -41,15 +41,41 @@
     .nav-home { font-size: 13px; color: var(--muted); }
     .nav-home:hover { color: var(--accent); opacity: 1; }
 
-    .layout { max-width: 860px; margin: 0 auto; padding: 40px 24px 80px; display: flex; gap: 40px; }
+    .layout { max-width: 1120px; margin: 0 auto; padding: 40px 24px 80px; display: flex; gap: 48px; }
 
     /* TOC sidebar */
-    .toc { width: 200px; flex-shrink: 0; }
+    .toc { width: 240px; flex-shrink: 0; }
     .toc-inner { position: sticky; top: 76px; }
     .toc-title { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px; color: var(--muted); margin-bottom: 12px; }
-    .toc-list { list-style: none; display: flex; flex-direction: column; gap: 4px; }
-    .toc-list a { font-size: 12px; color: var(--muted); line-height: 1.5; display: block; padding: 2px 0 2px 8px; border-left: 2px solid transparent; }
-    .toc-list a:hover { color: var(--accent); border-left-color: var(--accent); opacity: 1; }
+    .toc-list {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      max-height: calc(100vh - 112px);
+      overflow-y: auto;
+      padding-right: 8px;
+    }
+    .toc-list a {
+      color: var(--muted);
+      line-height: 1.45;
+      display: block;
+      border-left: 2px solid transparent;
+      transition: color 0.15s, border-color 0.15s, background 0.15s;
+    }
+    .toc-list a.toc-h2 { padding: 5px 8px; font-size: 12px; font-weight: 600; }
+    .toc-list a.toc-h3 { padding: 3px 8px 3px 20px; font-size: 11px; }
+    .toc-list a:hover {
+      color: var(--text);
+      border-left-color: var(--accent);
+      background: rgba(88, 166, 255, 0.06);
+      opacity: 1;
+    }
+    .toc-list a.active {
+      color: var(--accent);
+      border-left-color: var(--accent);
+      background: rgba(88, 166, 255, 0.1);
+    }
 
     /* Main content */
     .content { flex: 1; min-width: 0; }
@@ -63,10 +89,48 @@
     }
 
     /* Markdown rendered styles */
-    .md h1 { font-size: 32px; font-weight: 700; letter-spacing: -0.8px; margin-bottom: 8px; line-height: 1.2; }
-    .md h2 { font-size: 20px; font-weight: 700; margin: 36px 0 12px; padding-bottom: 8px; border-bottom: 1px solid var(--border); color: var(--text); }
-    .md h3 { font-size: 16px; font-weight: 600; margin: 24px 0 8px; color: var(--text); }
-    .md h4 { font-size: 14px; font-weight: 600; margin: 16px 0 6px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.4px; }
+    .md h1 {
+      font-size: 34px;
+      font-weight: 700;
+      letter-spacing: -0.9px;
+      margin-bottom: 14px;
+      line-height: 1.2;
+    }
+    .md h2 {
+      font-size: 23px;
+      font-weight: 700;
+      margin: 48px 0 18px;
+      padding: 0 0 10px;
+      border-bottom: 1px solid var(--border);
+      color: var(--text);
+      letter-spacing: -0.35px;
+      scroll-margin-top: 76px;
+    }
+    .md h2::before {
+      content: "#";
+      color: var(--accent);
+      margin-right: 9px;
+      font-weight: 500;
+    }
+    .md h3 {
+      font-size: 17px;
+      font-weight: 650;
+      margin: 30px 0 10px;
+      padding: 7px 10px;
+      color: var(--text);
+      border-left: 3px solid var(--purple);
+      background: rgba(163, 113, 247, 0.07);
+      border-radius: 0 5px 5px 0;
+      scroll-margin-top: 76px;
+    }
+    .md h4 {
+      font-size: 13px;
+      font-weight: 700;
+      margin: 20px 0 8px;
+      color: var(--accent);
+      text-transform: uppercase;
+      letter-spacing: 0.55px;
+    }
     .md p { color: var(--muted); margin-bottom: 14px; font-size: 15px; line-height: 1.8; }
     .md strong { color: var(--text); }
     .md ul, .md ol { color: var(--muted); padding-left: 20px; margin-bottom: 14px; }
@@ -145,8 +209,27 @@
     .md tr:hover td { background: var(--bg2); }
     .md hr { border: none; border-top: 1px solid var(--border); margin: 28px 0; }
     .md a { color: var(--accent); }
-    .md .mermaid { background: var(--bg2); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; margin: 16px 0; text-align: center; }
-    .md .mermaid svg { max-width: 100%; height: auto; }
+    .md img {
+      display: block;
+      max-width: 100%;
+      height: auto;
+      margin: 18px auto;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      background: #fff;
+    }
+    .md .mermaid { background: var(--bg2); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; margin: 16px 0; text-align: center; overflow-x: auto; }
+    .md .mermaid svg { max-width: none !important; min-width: 100%; height: auto; }
+    .md .mermaid .nodeLabel,
+    .md .mermaid .nodeLabel p {
+      font-size: 17px !important;
+      line-height: 1.35 !important;
+    }
+    .md .mermaid .edgeLabel,
+    .md .mermaid .edgeLabel * {
+      font-size: 17px !important;
+      line-height: 1.35 !important;
+    }
 
     .md details.code-block { margin: 16px 0; }
     .md details.code-block > summary {
@@ -247,23 +330,62 @@
         });
 
         // Initialize Mermaid
-        mermaid.initialize({ startOnLoad: false, theme: 'dark', themeVariables: { background: '#161b22', primaryColor: '#1f6feb', primaryTextColor: '#e6edf3', primaryBorderColor: '#30363d', lineColor: '#8b949e', secondaryColor: '#21262d', tertiaryColor: '#0d1117' } });
+        mermaid.initialize({
+          startOnLoad: false,
+          theme: 'dark',
+          themeVariables: {
+            background: '#161b22',
+            primaryColor: '#1f6feb',
+            primaryTextColor: '#e6edf3',
+            primaryBorderColor: '#30363d',
+            lineColor: '#8b949e',
+            secondaryColor: '#21262d',
+            tertiaryColor: '#0d1117',
+            fontSize: '17px'
+          }
+        });
         mermaid.run({ nodes: document.querySelectorAll('.mermaid') });
 
         // Update page title
         const h1 = document.querySelector('.md h1');
         if (h1) document.title = h1.textContent + ' — Devesh Kumar';
 
-        // Build TOC from h2s
-        const headings = document.querySelectorAll('.md h2');
+        // Build a two-level TOC from major sections and subsections.
+        const headings = document.querySelectorAll('.md h2, .md h3');
         const toc = document.getElementById('toc');
         headings.forEach((h, i) => {
           const id = 'section-' + i;
           h.id = id;
           const li = document.createElement('li');
-          li.innerHTML = `<a href="#${id}">${h.textContent}</a>`;
+          const link = document.createElement('a');
+          link.href = `#${id}`;
+          link.textContent = h.textContent;
+          link.className = h.tagName === 'H2' ? 'toc-h2' : 'toc-h3';
+          li.appendChild(link);
           toc.appendChild(li);
         });
+
+        // Keep the sidebar synchronized with the section currently in view.
+        const tocLinks = [...toc.querySelectorAll('a')];
+        const setActiveLink = id => {
+          tocLinks.forEach(link => {
+            link.classList.toggle('active', link.getAttribute('href') === `#${id}`);
+          });
+          const active = toc.querySelector('a.active');
+          if (active) active.scrollIntoView({ block: 'nearest' });
+        };
+
+        if (headings.length) {
+          setActiveLink(headings[0].id);
+          const observer = new IntersectionObserver(entries => {
+            const visible = entries
+              .filter(entry => entry.isIntersecting)
+              .sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top);
+            if (visible.length) setActiveLink(visible[0].target.id);
+          }, { rootMargin: '-70px 0px -72% 0px' });
+
+          headings.forEach(heading => observer.observe(heading));
+        }
       })
       .catch(() => {
         document.getElementById('content').innerHTML = '<p class="error">Could not load note. <a href="index.html">Go back to notes.</a></p>';

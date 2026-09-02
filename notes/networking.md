@@ -1,923 +1,553 @@
-# Networking - Interview Prep
+# Networking - Quick Reference for Interviews
 
-## OSI Model vs TCP/IP Model
+Use this note to revise the path a request takes through a network, the differences between TCP and UDP, and the most common application-layer communication choices.
 
-```
-OSI Model (7 Layers)          TCP/IP Model (4 Layers)
-┌──────────────────┐
-│  7. Application  │          ┌──────────────────┐
-├──────────────────┤          │   Application    │
-│  6. Presentation │          │   (HTTP, FTP,    │
-├──────────────────┤          │    DNS, SMTP)    │
-│  5. Session      │          └──────────────────┘
-└──────────────────┘
-┌──────────────────┐          ┌──────────────────┐
-│  4. Transport    │          │   Transport      │
-│  (TCP/UDP)       │          │   (TCP/UDP)      │
-└──────────────────┘          └──────────────────┘
-┌──────────────────┐          ┌──────────────────┐
-│  3. Network      │          │   Internet       │
-│  (IP)            │          │   (IP, ICMP)     │
-└──────────────────┘          └──────────────────┘
-┌──────────────────┐          ┌──────────────────┐
-│  2. Data Link    │          │   Link/Network   │
-├──────────────────┤          │   Access         │
-│  1. Physical     │          │   (Ethernet)     │
-└──────────────────┘          └──────────────────┘
-```
+> **Interview focus:** Be able to explain what happens when you enter a URL, why TCP is reliable, when UDP is preferred, and how REST, gRPC, SSE, WebSockets, and WebRTC differ.
 
-**Layer Functions:**
+## The 7 OSI Layers
 
-**Application (L7):** User-facing protocols (HTTP, DNS, SMTP)
-**Presentation (L6):** Data formatting, encryption (SSL/TLS)
-**Session (L5):** Session management, connections
-**Transport (L4):** End-to-end delivery (TCP/UDP)
-**Network (L3):** Routing, IP addressing
-**Data Link (L2):** Frame delivery on local network (MAC addresses)
-**Physical (L1):** Bits on wire (electrical signals)
+The **OSI (Open Systems Interconnection) model** divides network communication into seven conceptual layers. Each layer has a specific responsibility and communicates with the layers directly above and below it.
 
-## TCP vs UDP
+![The seven OSI layers](./images/networking-osi-layers.png)
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│                    TCP vs UDP                                │
-├──────────────────┬──────────────────────────────────────────┤
-│   TCP            │   UDP                                     │
-│   (Transmission  │   (User Datagram Protocol)               │
-│    Control       │                                           │
-│    Protocol)     │                                           │
-├──────────────────┼──────────────────────────────────────────┤
-│ Connection-      │ Connectionless                            │
-│ oriented         │                                           │
-├──────────────────┼──────────────────────────────────────────┤
-│ Reliable         │ Unreliable (best effort)                 │
-│ (guaranteed      │                                           │
-│  delivery)       │                                           │
-├──────────────────┼──────────────────────────────────────────┤
-│ Ordered          │ No ordering guarantee                    │
-├──────────────────┼──────────────────────────────────────────┤
-│ Flow Control     │ No flow control                          │
-│ (prevents        │                                           │
-│  overflow)       │                                           │
-├──────────────────┼──────────────────────────────────────────┤
-│ Congestion       │ No congestion control                    │
-│ Control          │                                           │
-├──────────────────┼──────────────────────────────────────────┤
-│ Header: 20-60    │ Header: 8 bytes (lightweight)            │
-│ bytes            │                                           │
-├──────────────────┼──────────────────────────────────────────┤
-│ Slower           │ Faster (less overhead)                   │
-├──────────────────┼──────────────────────────────────────────┤
-│ Use Cases:       │ Use Cases:                               │
-│ - HTTP/HTTPS     │ - DNS queries                            │
-│ - Email (SMTP)   │ - Video streaming                        │
-│ - File Transfer  │ - Online gaming                          │
-│ - SSH            │ - VoIP                                   │
-│                  │ - IoT sensors                            │
-└──────────────────┴──────────────────────────────────────────┘
+### Mnemonic
+
+From **Layer 7 to Layer 1**:
+
+> **All People Seem To Need Data Processing**
+
+| Word | Layer |
+|---|---|
+| **All** | Application |
+| **People** | Presentation |
+| **Seem** | Session |
+| **To** | Transport |
+| **Need** | Network |
+| **Data** | Data Link |
+| **Processing** | Physical |
+
+**Layer 7 - Application**
+
+Provides network services directly to user-facing applications. Protocols such as HTTP, DNS, SMTP, and FTP operate here.
+
+**Layer 6 - Presentation**
+
+Transforms data into a format the application can understand. It handles concerns such as encoding, serialization, compression, and encryption.
+
+**Layer 5 - Session**
+
+Creates, manages, and terminates communication sessions between applications. It also helps with dialog control and session recovery.
+
+**Layer 4 - Transport**
+
+Provides end-to-end communication between processes using **port numbers**. TCP adds reliability and ordering, while UDP favors low overhead and speed.
+
+**Layer 3 - Network**
+
+Moves packets between different networks using logical addresses such as IPv4 and IPv6. Routers operate primarily at this layer.
+
+**Layer 2 - Data Link**
+
+Transfers frames between devices on the same local network using MAC addresses. Ethernet switches operate primarily at this layer.
+
+**Layer 1 - Physical**
+
+Transmits raw bits through cables, fiber, or radio signals. It defines the physical medium, connectors, voltage, frequency, and signaling.
+
+### OSI Encapsulation
+
+As data moves down the sender's stack, each layer adds control information. The receiver removes it in reverse order.
+
+```text
+Application data
+    -> Transport segment/datagram
+    -> Network packet
+    -> Data-link frame
+    -> Physical bits
 ```
 
-## TCP Three-Way Handshake
+> **Interview shortcut:** Application creates the data, Transport connects processes, Network routes between networks, Data Link delivers on the local network, and Physical transmits the bits.
 
-```
-Client                                  Server
-  │                                        │
-  │         SYN (seq=100)                 │
-  │──────────────────────────────────────▶│
-  │                                        │
-  │    SYN-ACK (seq=300, ack=101)        │
-  │◀──────────────────────────────────────│
-  │                                        │
-  │         ACK (ack=301)                 │
-  │──────────────────────────────────────▶│
-  │                                        │
-  │     Connection Established            │
-  │◀─────────────────────────────────────▶│
+## Network Layer and Addressing
 
-Step 1: Client sends SYN with initial sequence number
-Step 2: Server responds with SYN-ACK (its seq + ack of client's seq+1)
-Step 3: Client sends ACK (acknowledges server's seq+1)
-```
+The network layer is responsible for logical addressing and routing packets between networks. Its central protocol is **IP (Internet Protocol)**.
 
-## TCP Four-Way Termination
+### Private IP Address
 
-```
-Client                                  Server
-  │                                        │
-  │         FIN (seq=100)                 │
-  │──────────────────────────────────────▶│
-  │                                        │
-  │         ACK (ack=101)                 │
-  │◀──────────────────────────────────────│
-  │                                        │
-  │         FIN (seq=300)                 │
-  │◀──────────────────────────────────────│
-  │                                        │
-  │         ACK (ack=301)                 │
-  │──────────────────────────────────────▶│
-  │                                        │
-  │     Connection Closed                 │
+A **private IP address** identifies a device inside a private network such as a home, office, or cloud virtual network. It is not directly routable on the public internet and may be reused by many independent networks.
 
-Step 1: Client sends FIN (wants to close)
-Step 2: Server ACKs FIN (acknowledges)
-Step 3: Server sends FIN (ready to close)
-Step 4: Client ACKs FIN (connection closed)
+Private IPv4 ranges:
 
-TIME_WAIT state: Client waits 2*MSL before fully closing
+| Range | CIDR | Common environment |
+|---|---|---|
+| `10.0.0.0` - `10.255.255.255` | `10.0.0.0/8` | Large enterprise and cloud networks |
+| `172.16.0.0` - `172.31.255.255` | `172.16.0.0/12` | Enterprise and container networks |
+| `192.168.0.0` - `192.168.255.255` | `192.168.0.0/16` | Home and small office networks |
+
+**Example:** A laptop may have the private address `192.168.1.20` inside a home Wi-Fi network.
+
+### Public IP Address
+
+A **public IP address** is globally unique and routable over the internet. It is normally assigned to an internet-facing router, load balancer, server, or NAT gateway by an ISP or cloud provider.
+
+**Example:** A public web server might be reachable through `203.0.113.10`.
+
+> The example range `203.0.113.0/24` is reserved for documentation and should not be used as a real destination.
+
+### When Are Private and Public IPs Used Together?
+
+Most client devices use a private IP internally and share a public IP when communicating with the internet. A router or gateway performs **Network Address Translation (NAT)**.
+
+```mermaid
+flowchart LR
+    A["Laptop<br/>192.168.1.20"] --> R["Router / NAT<br/>Public IP"]
+    B["Phone<br/>192.168.1.21"] --> R
+    R --> I["Internet"]
+    I --> S["Public server"]
 ```
 
-## HTTP Methods
+- **Outbound traffic:** NAT replaces the device's private source address with the gateway's public address and tracks the connection.
+- **Return traffic:** The gateway uses its translation table to send the response back to the correct private device.
+- **Inbound traffic:** An internal service normally needs port forwarding, a reverse proxy, a load balancer, or another explicit mapping to be reachable publicly.
 
-```
-┌────────┬──────────┬─────────────┬─────────────────────────┐
-│Method  │Safe?     │Idempotent?  │Use Case                 │
-├────────┼──────────┼─────────────┼─────────────────────────┤
-│GET     │Yes       │Yes          │Retrieve resource        │
-│POST    │No        │No           │Create resource          │
-│PUT     │No        │Yes          │Update/Replace resource  │
-│PATCH   │No        │No           │Partial update           │
-│DELETE  │No        │Yes          │Delete resource          │
-│HEAD    │Yes       │Yes          │GET without body         │
-│OPTIONS │Yes       │Yes          │Get allowed methods      │
-└────────┴──────────┴─────────────┴─────────────────────────┘
+> **Interview focus:** Private IPs conserve IPv4 addresses and isolate internal addressing. NAT provides translation, but it is not a replacement for a firewall.
 
-Safe: Does not modify server state
-Idempotent: Multiple identical requests have same effect as one
+### DNS - Domain Name System
+
+**DNS** translates human-readable domain names such as `example.com` into IP addresses that computers use for routing.
+
+It lets services change IP addresses without changing their domain names and can return multiple addresses for load distribution and resilience.
+
+```text
+Browser cache -> OS cache -> DNS resolver -> authoritative DNS server -> IP address
 ```
 
-## HTTP Status Codes
+DNS is an **application-layer protocol**. It commonly uses UDP port `53`, while TCP is used for cases such as larger responses and zone transfers.
 
-```
-1xx: Informational
-  100 Continue
-  101 Switching Protocols
+## Transport Layer Protocols
 
-2xx: Success
-  200 OK
-  201 Created
-  204 No Content
+The transport layer provides process-to-process communication. It uses **ports** to deliver incoming data to the correct application.
 
-3xx: Redirection
-  301 Moved Permanently
-  302 Found (Temporary Redirect)
-  304 Not Modified (Cache valid)
-  307 Temporary Redirect
-  308 Permanent Redirect
+### TCP - Transmission Control Protocol
 
-4xx: Client Error
-  400 Bad Request
-  401 Unauthorized (not authenticated)
-  403 Forbidden (authenticated but no permission)
-  404 Not Found
-  405 Method Not Allowed
-  408 Request Timeout
-  409 Conflict
-  429 Too Many Requests
+**TCP** is a connection-oriented transport protocol that provides reliable, ordered, and duplicate-free delivery of a byte stream.
 
-5xx: Server Error
-  500 Internal Server Error
-  502 Bad Gateway
-  503 Service Unavailable
-  504 Gateway Timeout
-```
+TCP achieves reliability through:
 
-## DNS (Domain Name System)
+- Sequence numbers that identify bytes and restore ordering.
+- Acknowledgements that confirm received data.
+- Retransmission when data appears to be lost.
+- Checksums that detect corruption.
+- Flow control that protects a slow receiver.
+- Congestion control that reduces pressure on the network.
 
-```
-DNS Resolution Process:
+TCP does not preserve application message boundaries. Applications must define framing through mechanisms such as content length, delimiters, or length-prefixed messages.
 
-User types "www.example.com"
-    │
-    ▼
-┌─────────────┐
-│Local Cache  │ Check browser/OS cache
-└──────┬──────┘
-       │ Miss
-       ▼
-┌─────────────┐
-│Recursive    │ ISP's DNS server
-│Resolver     │
-└──────┬──────┘
-       │
-       ▼
-┌─────────────┐
-│Root Server  │ "Ask .com server"
-│     (.)     │
-└──────┬──────┘
-       │
-       ▼
-┌─────────────┐
-│TLD Server   │ "Ask example.com's nameserver"
-│    (.com)   │
-└──────┬──────┘
-       │
-       ▼
-┌─────────────┐
-│Authoritative│ "www.example.com = 93.184.216.34"
-│Name Server  │
-└──────┬──────┘
-       │
-       ▼
-    IP Address
+### TCP Three-Way Handshake
 
-DNS Record Types:
-- A: IPv4 address
-- AAAA: IPv6 address
-- CNAME: Canonical name (alias)
-- MX: Mail exchange
-- NS: Name server
-- TXT: Text records (SPF, DKIM)
-- SOA: Start of authority
+Before sending application data, TCP establishes a connection and synchronizes sequence numbers.
+
+```mermaid
+sequenceDiagram
+    participant C as Client
+    participant S as Server
+
+    C->>S: SYN, Seq = x
+    S-->>C: SYN-ACK, Seq = y, Ack = x + 1
+    C->>S: ACK, Ack = y + 1
+    Note over C,S: Connection established
 ```
 
-## Load Balancing Algorithms
+1. **SYN:** The client asks to start a connection and sends its initial sequence number.
+2. **SYN-ACK:** The server acknowledges the client and sends its own initial sequence number.
+3. **ACK:** The client acknowledges the server. Both sides can now exchange data.
 
-```
-1. Round Robin
-   Request 1 → Server A
-   Request 2 → Server B
-   Request 3 → Server C
-   Request 4 → Server A (cycle)
-   Simple, equal distribution
+> **Why three messages?** Both sides must confirm that they can send and receive and must acknowledge each other's initial sequence number.
 
-2. Least Connections
-   Route to server with fewest active connections
-   Good for long-lived connections
+### TCP Connection Teardown
 
-3. Least Response Time
-   Route to server with lowest latency + fewest connections
-   Performance-aware
+TCP is full duplex, so each direction closes independently. A graceful close usually requires four messages.
 
-4. IP Hash
-   Hash(Client IP) % num_servers
-   Same client always goes to same server
-   Good for session persistence
+```mermaid
+sequenceDiagram
+    participant C as Client
+    participant S as Server
 
-5. Weighted Round Robin
-   Server A (weight=3): Gets 3/6 requests
-   Server B (weight=2): Gets 2/6 requests
-   Server C (weight=1): Gets 1/6 requests
-   Accounts for different server capacities
-
-6. Random
-   Randomly select server
-   Simple, works well at scale
+    C->>S: FIN
+    S-->>C: ACK
+    S-->>C: FIN
+    C->>S: ACK
+    Note over C: TIME_WAIT
 ```
 
-## CDN (Content Delivery Network)
+1. One side sends **FIN**, meaning it has no more data to send.
+2. The peer sends **ACK**, confirming that half of the connection is closed.
+3. When ready, the peer sends its own **FIN**.
+4. The original side sends the final **ACK** and temporarily enters `TIME_WAIT`.
 
-```
-How CDN Works:
+`TIME_WAIT` allows delayed packets from the old connection to expire and gives the final ACK time to be retransmitted if necessary.
 
-User in Tokyo requests www.example.com/image.jpg
-    │
-    ▼
-┌─────────────────┐
-│  DNS Resolution │
-│  Returns IP of  │
-│  nearest CDN    │
-│  edge server    │
-└────────┬────────┘
-         │
-         ▼
-┌─────────────────┐
-│ CDN Edge Server │ (Tokyo)
-│  in Tokyo       │
-└────────┬────────┘
-         │
-         ├─ HIT: Serve from cache ──────────┐
-         │                                   ▼
-         └─ MISS: ────────────────┐     User receives
-                                  │     content
-                                  ▼
-                          ┌──────────────┐
-                          │ Origin Server│
-                          │  (US)        │
-                          └──────┬───────┘
-                                 │
-                          Cache on edge ──┐
-                          and serve       │
-                                         ▼
-                                     User receives
-                                     content
+> A **RST** closes a connection immediately rather than performing a graceful teardown. It may indicate an invalid connection, an unavailable port, or an application abort.
 
-Benefits:
-- Lower latency (geographically closer)
-- Reduced origin load
-- DDoS protection
-- Better availability
-```
+### UDP - User Datagram Protocol
 
-## HTTP/1.1 vs HTTP/2 vs HTTP/3
+**UDP** is a connectionless transport protocol that sends independent datagrams without establishing a connection or guaranteeing delivery, ordering, or duplicate protection.
 
-```
-┌──────────────┬─────────────┬─────────────┬─────────────┐
-│Feature       │HTTP/1.1     │HTTP/2       │HTTP/3       │
-├──────────────┼─────────────┼─────────────┼─────────────┤
-│Transport     │TCP          │TCP          │QUIC (UDP)   │
-├──────────────┼─────────────┼─────────────┼─────────────┤
-│Multiplexing  │No (6 conns  │Yes          │Yes          │
-│              │per domain)  │             │             │
-├──────────────┼─────────────┼─────────────┼─────────────┤
-│Head-of-line  │Yes          │Partial      │No           │
-│blocking      │             │(TCP level)  │             │
-├──────────────┼─────────────┼─────────────┼─────────────┤
-│Header        │Plain text   │Binary,      │Binary,      │
-│compression   │             │HPACK        │QPACK        │
-├──────────────┼─────────────┼─────────────┼─────────────┤
-│Server Push   │No           │Yes          │Yes          │
-├──────────────┼─────────────┼─────────────┼─────────────┤
-│Priority      │No           │Yes          │Yes          │
-├──────────────┼─────────────┼─────────────┼─────────────┤
-│Encryption    │Optional     │De facto     │Mandatory    │
-│              │(HTTPS)      │required     │             │
-└──────────────┴─────────────┴─────────────┴─────────────┘
+#### Key Characteristics of UDP
 
-HTTP/1.1: 1 request per connection (or sequential)
-HTTP/2: Multiple requests on single connection (multiplexing)
-HTTP/3: Built on QUIC, faster connection setup, better mobile
-```
+- No handshake before sending data.
+- Best-effort delivery; packets may be lost or duplicated.
+- Packets may arrive out of order.
+- Preserves datagram boundaries.
+- No built-in retransmission, flow control, or congestion control.
+- Small fixed header of **8 bytes**.
+- Supports broadcast and multicast where the network allows them.
+- Applications can add only the reliability features they need.
 
-## WebSocket vs HTTP
+#### Where Is UDP Used?
 
-```
-HTTP (Request-Response):
-Client                Server
-  │────Request───────▶│
-  │◀───Response───────│
-  Connection closed
+- **Live video and audio:** Late data may be less useful than dropped data.
+- **Online gaming:** Low latency is more important than retransmitting every position update.
+- **VoIP:** A brief missing audio packet is preferable to delayed conversation.
+- **DNS lookups:** Most small queries and responses fit efficiently in one datagram.
+- **DHCP and service discovery:** Broadcast and multicast are useful before a host knows its network configuration.
+- **QUIC / HTTP/3:** QUIC builds reliable, secure, multiplexed communication in user space on top of UDP.
 
-WebSocket (Full-Duplex):
-Client                Server
-  │──Upgrade Request─▶│ (HTTP upgrade)
-  │◀──101 Switching──│
-  │                   │
-  │◀─────Data────────▶│ (bidirectional)
-  │◀─────Data────────▶│
-  │◀─────Data────────▶│
-  │                   │
-  Connection stays open
+> **Important:** UDP itself is not automatically faster. Its smaller protocol overhead and lack of connection setup can reduce latency, but the application's design and network conditions determine actual performance.
 
-WebSocket Benefits:
-- Real-time bidirectional communication
-- Lower latency (no HTTP overhead per message)
-- Server can push data without client request
-- Use cases: Chat, live feeds, gaming, collaborative editing
+### TCP vs UDP Comparison
+
+| Feature | UDP | TCP |
+|---|---|---|
+| Connection | Connectionless | Connection-oriented |
+| Reliability | Best-effort delivery | Reliable delivery with acknowledgements and retransmission |
+| Ordering | No ordering guarantee | Maintains byte-stream order |
+| Data model | Individual datagrams | Continuous byte stream |
+| Flow control | No | Yes |
+| Congestion control | No built-in mechanism | Yes |
+| Header size | 8 bytes | 20-60 bytes |
+| Setup | No handshake | Three-way handshake |
+| Broadcast / multicast | Supported | Not supported |
+| Typical latency | Lower protocol overhead | More overhead for reliability |
+| Common uses | Streaming, gaming, VoIP, DNS, QUIC | HTTP/1.1, HTTP/2, SSH, email, file transfer, databases |
+
+#### How to Choose
+
+- Choose **TCP** when correctness, complete delivery, and ordering matter more than occasional delay.
+- Choose **UDP** when low latency, independent messages, multicast, or application-controlled reliability is more important.
+- Choose a protocol built above them when possible; application developers rarely implement raw TCP or UDP behavior from scratch.
+
+## Application Layer Protocols
+
+The application layer defines how software services exchange meaningful requests, responses, events, media, and messages.
+
+### How to Choose an Application Protocol
+
+```mermaid
+flowchart TD
+    Start["What communication does the system need?"] --> Realtime{"Real-time communication?"}
+
+    Realtime -- No --> API{"Who controls the API?"}
+    API -- "Public API or standard CRUD" --> REST["REST over HTTP/HTTPS"]
+    API -- "Clients need flexible data shapes" --> GraphQL["GraphQL"]
+    API -- "Internal services need typed, efficient calls" --> GRPC["gRPC"]
+
+    Realtime -- Yes --> Direction{"Communication direction?"}
+    Direction -- "Server to client only" --> SSE["Server-Sent Events"]
+    Direction -- "Two-way application messages" --> WS["WebSockets"]
+    Direction -- "Peer-to-peer audio, video, or data" --> WebRTC["WebRTC"]
 ```
 
-## HTTPS/TLS Handshake
+| If you need... | Start with... |
+|---|---|
+| A conventional public or CRUD API | REST |
+| Client-controlled fields from connected data | GraphQL |
+| Fast, strongly typed internal service calls | gRPC |
+| One-way live updates from server to browser | SSE |
+| Persistent two-way messaging | WebSockets |
+| Real-time peer audio, video, or data | WebRTC |
 
-```
-Client                                          Server
-  │                                                │
-  │          ClientHello                          │
-  │  (supported ciphers, TLS version)            │
-  │──────────────────────────────────────────────▶│
-  │                                                │
-  │          ServerHello                          │
-  │  (chosen cipher, certificate)                 │
-  │◀──────────────────────────────────────────────│
-  │                                                │
-  │  Client verifies certificate                  │
-  │  (check CA signature, validity)               │
-  │                                                │
-  │  Client generates pre-master secret           │
-  │  Encrypts with server's public key            │
-  │──────────────────────────────────────────────▶│
-  │                                                │
-  Both derive session keys from pre-master secret
-  │                                                │
-  │          Finished (encrypted)                 │
-  │◀────────────────────────────────────────────▶│
-  │                                                │
-  │     Encrypted application data                │
-  │◀────────────────────────────────────────────▶│
+> **Rule of thumb:** Prefer the simplest request-response option that meets the requirements. Use a persistent real-time protocol only when polling or normal HTTP requests are insufficient.
 
-Symmetric encryption (AES) used for data after handshake
-Asymmetric encryption (RSA/ECDHE) used for key exchange
+### HTTP and HTTPS
+
+**HTTP** is a stateless request-response protocol used to transfer resources and API messages. A client sends a method, path, headers, and optional body; the server returns a status code, headers, and optional body.
+
+**Stateless** means each request contains the information needed to process it; the HTTP protocol does not require the server to remember previous requests. Applications can still maintain user state through cookies, tokens, sessions, or a database.
+
+```http
+GET /users/42 HTTP/1.1
+Host: api.example.com
+Accept: application/json
+
+HTTP/1.1 200 OK
+Content-Type: application/json
+
+{"id":42,"name":"Alex"}
 ```
 
-## IP Addressing
+An HTTP message has four important parts: **method/path**, **headers**, **status code**, and an optional **body**.
 
-### IPv4
+#### Common HTTP Methods
 
-```
-32-bit address: 192.168.1.1
+| Method | Typical purpose |
+|---|---|
+| `GET` | Read a resource |
+| `POST` | Create a resource or trigger an operation |
+| `PUT` | Replace a resource |
+| `PATCH` | Partially update a resource |
+| `DELETE` | Remove a resource |
 
-Binary: 11000000.10101000.00000001.00000001
+`GET`, `PUT`, and `DELETE` should be **idempotent**: repeating the same request should have the same intended effect as making it once. `POST` is not inherently idempotent.
 
-Classes (Historical):
-Class A: 0.0.0.0    - 127.255.255.255  (8-bit network)
-Class B: 128.0.0.0  - 191.255.255.255  (16-bit network)
-Class C: 192.0.0.0  - 223.255.255.255  (24-bit network)
+#### Common HTTP Status Codes
 
-Private Ranges (RFC 1918):
-10.0.0.0/8        (10.0.0.0 - 10.255.255.255)
-172.16.0.0/12     (172.16.0.0 - 172.31.255.255)
-192.168.0.0/16    (192.168.0.0 - 192.168.255.255)
+| Group | Common examples |
+|---|---|
+| Success `2xx` | `200 OK`, `201 Created`, `204 No Content` |
+| Redirect `3xx` | `301 Moved Permanently`, `302 Found` |
+| Client error `4xx` | `400 Bad Request`, `401 Unauthorized`, `403 Forbidden`, `404 Not Found`, `429 Too Many Requests` |
+| Server error `5xx` | `500 Internal Server Error`, `502 Bad Gateway`, `503 Service Unavailable` |
 
-Special Addresses:
-127.0.0.1         Loopback
-0.0.0.0           Default route
-255.255.255.255   Broadcast
-```
+**HTTPS** is HTTP protected by TLS. TLS provides:
 
-### CIDR (Classless Inter-Domain Routing)
+- **Encryption:** Prevents intermediaries from reading the traffic.
+- **Integrity:** Detects traffic modification.
+- **Authentication:** Certificates help verify the server's identity.
 
-```
-192.168.1.0/24
+> **Security note:** HTTPS protects data in transit; it does not make client input trustworthy. The server must still authenticate the caller, authorize access, and validate all input.
 
-/24 = subnet mask = 255.255.255.0
-= 24 bits for network, 8 bits for hosts
-= 2^8 = 256 addresses (254 usable)
+HTTP versions commonly use different transports:
 
-Example:
-192.168.1.0/24
-Network:   192.168.1.0
-Usable:    192.168.1.1 - 192.168.1.254
-Broadcast: 192.168.1.255
+| Version | Transport |
+|---|---|
+| HTTP/1.1 | TCP |
+| HTTP/2 | TCP with multiplexed streams |
+| HTTP/3 | QUIC over UDP |
 
-Subnet Mask Shorthand:
-/8  = 255.0.0.0       (16,777,216 hosts)
-/16 = 255.255.0.0     (65,536 hosts)
-/24 = 255.255.255.0   (256 hosts)
-/32 = 255.255.255.255 (1 host - single IP)
-```
+### REST - Simple and Flexible
 
-### NAT (Network Address Translation)
+**REST** is an architectural style in which resources are identified by URLs and manipulated through standard HTTP methods.
 
-```
-Private Network (192.168.1.0/24)
-┌──────────────────────────────────┐
-│  Host A: 192.168.1.10            │
-│  Host B: 192.168.1.11            │
-│  Host C: 192.168.1.12            │
-└───────────┬──────────────────────┘
-            │
-            ▼
-      ┌──────────┐
-      │   NAT    │
-      │ Router   │
-      └────┬─────┘
-           │ Public IP: 203.0.113.5
-           │
-           ▼
-      Internet
-
-NAT Translation Table:
-Private IP:Port     →  Public IP:Port     →  Destination
-192.168.1.10:5000  →  203.0.113.5:6000  →  1.2.3.4:80
-192.168.1.11:5001  →  203.0.113.5:6001  →  5.6.7.8:443
-
-Multiple private IPs share one public IP
-Port translation distinguishes connections
+```text
+GET    /users/42          -> read a user
+POST   /users             -> create a user
+PATCH  /users/42          -> update part of a user
+GET    /users/42/orders   -> read the user's orders
 ```
 
-## Subnetting Example
+Model URLs around **resource nouns** such as `/users` and `/orders`, not method names such as `/getUser` or `/createOrder`. Use the HTTP method to express the operation.
 
-```
-Given: 192.168.1.0/24, split into 4 subnets
+**Strengths:** Simple, widely supported, cache-friendly, human-readable, and a strong default for public APIs and CRUD services.
 
-Need 2 more bits for 4 subnets (2^2 = 4)
-New mask: /26 (24 + 2)
+**Trade-offs:** JSON has serialization overhead, clients may over-fetch or under-fetch data, and multi-resource screens may require several network round trips.
 
-Subnet 1: 192.168.1.0/26
-  Range: 192.168.1.0 - 192.168.1.63
-  Usable: 192.168.1.1 - 192.168.1.62 (62 hosts)
+**Good fit:** Public APIs, browser and mobile backends, CRUD services, and systems where broad interoperability matters.
 
-Subnet 2: 192.168.1.64/26
-  Range: 192.168.1.64 - 192.168.1.127
-  Usable: 192.168.1.65 - 192.168.1.126
+> **Interview default:** Start with REST unless the requirements clearly need flexible queries, high-performance internal RPC, or real-time communication.
 
-Subnet 3: 192.168.1.128/26
-  Range: 192.168.1.128 - 192.168.1.191
-  Usable: 192.168.1.129 - 192.168.1.190
+### GraphQL - Flexible Data Fetching
 
-Subnet 4: 192.168.1.192/26
-  Range: 192.168.1.192 - 192.168.1.255
-  Usable: 192.168.1.193 - 192.168.1.254
+**GraphQL** exposes a typed schema and lets clients request exactly the fields they need, often through a single endpoint.
+
+```graphql
+query {
+  user(id: 42) {
+    name
+    orders { id status }
+  }
+}
 ```
 
-## Routing
+- **Over-fetching:** A REST response returns fields the client does not need.
+- **Under-fetching:** The client needs multiple endpoint calls to construct one view.
 
-### Static vs Dynamic Routing
+**Strengths:** Reduces over-fetching and round trips, supports nested data retrieval, provides schema introspection, and gives frontends flexible queries.
 
-**Static Routing:**
-* Manually configured routes
-* Simple, predictable
-* Doesn't adapt to network changes
-* Good for small networks
+**Trade-offs:** Query cost control, authorization, caching, N+1 database queries, and schema evolution require careful design.
 
-**Dynamic Routing:**
-* Routers share routing information
-* Automatically adapt to topology changes
-* Protocols: RIP, OSPF, BGP
-* Good for large, complex networks
+**Good fit:** Product UIs with varied data requirements and multiple clients that need different views of connected data.
 
-### Routing Table
+> **Interview guidance:** Use GraphQL when client flexibility is a real requirement, not simply because the data contains relationships.
 
-```
-Destination     Gateway         Mask            Interface
-0.0.0.0         192.168.1.1     0.0.0.0         eth0  (Default route)
-192.168.1.0     0.0.0.0         255.255.255.0   eth0  (Local network)
-10.0.0.0        192.168.1.254   255.0.0.0       eth0  (Via gateway)
+### gRPC - Efficient Service Communication
 
-Most specific match wins (longest prefix match)
-```
+**gRPC** is an RPC framework that commonly uses HTTP/2 and Protocol Buffers for strongly typed contracts and compact binary messages. Service definitions generate client and server code in multiple languages.
 
-## ARP (Address Resolution Protocol)
+**Strengths:** Efficient serialization, generated clients, explicit contracts, deadlines, and unary, client-streaming, server-streaming, or bidirectional calls.
 
-```
-Maps IP address to MAC address
+**Trade-offs:** Binary payloads are less human-readable, browser support usually needs gRPC-Web or a gateway, and public API debugging is less convenient than plain HTTP/JSON.
 
-Host A wants to send to 192.168.1.10 (Host B)
-But only knows MAC addresses work on local network
+**Good fit:** Internal microservices, low-latency communication, polyglot systems, and strongly typed service contracts.
 
-┌─────────────────────────────────────────┐
-│  1. ARP Request (Broadcast)              │
-│     "Who has 192.168.1.10?"             │
-│     Src MAC: AA:AA:AA:AA:AA:AA          │
-│     Dst MAC: FF:FF:FF:FF:FF:FF (all)    │
-└─────────────────┬───────────────────────┘
-                  │
-                  ▼
-         ┌────────────────────┐
-         │  All hosts receive │
-         └────────┬───────────┘
-                  │
-                  ▼
-┌─────────────────────────────────────────┐
-│  2. ARP Reply (Unicast)                  │
-│     "192.168.1.10 is at BB:BB:BB:BB:BB:BB"│
-│     From Host B to Host A               │
-└─────────────────────────────────────────┘
-                  │
-                  ▼
-         ┌────────────────┐
-         │  ARP Cache     │
-         │  192.168.1.10  │
-         │  = BB:BB:BB... │
-         └────────────────┘
+> A common design uses **REST externally** for compatibility and **gRPC internally** for efficient service-to-service calls.
 
-ARP cache expires after timeout (typically minutes)
+### Server-Sent Events - Real-Time Server Push
+
+**SSE** keeps an HTTP connection open so a server can continuously push text events to a browser. Communication is one-way: server to client.
+
+```text
+id: 101
+event: price-update
+data: {"price": 250}
 ```
 
-## ICMP (Internet Control Message Protocol)
+**Strengths:** Simple browser `EventSource` API, automatic reconnection, event IDs for resuming missed messages, and compatibility with standard HTTP infrastructure.
 
-```
-Used for network diagnostics and errors
+**Trade-offs:** The client cannot send events over the same stream, data is text-based, and proxies or load balancers may buffer or terminate long-lived connections.
 
-Common ICMP Messages:
-- Echo Request/Reply (ping)
-- Destination Unreachable
-- Time Exceeded (TTL expired - traceroute)
-- Redirect
+**Good fit:** Notifications, dashboards, progress updates, live scores, and AI token streaming.
 
-Ping Example:
-Host A ──Echo Request───▶ Host B
-Host A ◀─Echo Reply──────  Host B
+### WebSockets - Real-Time Bidirectional Communication
 
-Traceroute Example:
-Send packets with increasing TTL:
-TTL=1 → First router responds "Time Exceeded"
-TTL=2 → Second router responds "Time Exceeded"
-TTL=3 → Third router responds "Time Exceeded"
-...
-TTL=n → Destination responds "Echo Reply"
+**WebSockets** start with an HTTP upgrade handshake and then create a persistent, full-duplex connection over which either side can send messages.
 
-Shows path packets take through network
+```text
+HTTP upgrade -> persistent WebSocket connection -> client and server exchange frames
 ```
 
-## Firewall Types
+**Strengths:** Low-overhead bidirectional messaging and support for text or binary frames.
 
-```
-1. Packet Filter (Layer 3/4)
-   ├─ Checks: IP, port, protocol
-   ├─ Fast, simple
-   └─ No application awareness
+**Trade-offs:** WebSockets provide a communication channel, not an application message contract. The system must define message types and handle stateful scaling, load balancing, reconnection, authentication refresh, backpressure, and missed-message recovery.
 
-2. Stateful Inspection
-   ├─ Tracks connection state
-   ├─ Remembers outbound requests
-   └─ Allows return traffic automatically
+**Good fit:** Chat, collaborative editing, multiplayer updates, trading dashboards, and interactive real-time applications.
 
-3. Application Layer (Layer 7)
-   ├─ Inspects application data
-   ├─ Can block specific URLs, patterns
-   └─ Slower but more secure
+> **Interview guidance:** Do not choose WebSockets for ordinary request-response traffic or one-way updates that SSE can handle.
 
-4. Next-Gen Firewall (NGFW)
-   ├─ Deep packet inspection
-   ├─ Intrusion prevention
-   ├─ Application awareness
-   └─ Malware detection
+### WebRTC - Peer-to-Peer Communication
+
+**WebRTC** enables real-time audio, video, and data communication, usually between browsers or devices. It uses signaling to exchange connection metadata, STUN to discover public addresses, and TURN to relay traffic when direct connectivity fails.
+
+```text
+1. Peers connect to a signaling server.
+2. STUN helps each peer discover a publicly reachable address.
+3. Peers exchange connection details through signaling.
+4. They connect directly, or fall back to a TURN relay.
 ```
 
-## Common Ports
+**Strengths:** Very low-latency media, peer-to-peer paths where possible, built-in encryption, and support for audio, video, and data channels.
 
-```
-┌──────┬─────────────────────────────────┐
-│Port  │Service                          │
-├──────┼─────────────────────────────────┤
-│  20  │FTP (data)                       │
-│  21  │FTP (control)                    │
-│  22  │SSH                              │
-│  23  │Telnet                           │
-│  25  │SMTP (email sending)             │
-│  53  │DNS                              │
-│  80  │HTTP                             │
-│  110 │POP3 (email retrieval)           │
-│  143 │IMAP (email)                     │
-│  443 │HTTPS                            │
-│  3306│MySQL                            │
-│  3389│RDP (Remote Desktop)             │
-│  5432│PostgreSQL                       │
-│  6379│Redis                            │
-│  8080│HTTP Alternate                   │
-│  9200│Elasticsearch                    │
-│ 27017│MongoDB                          │
-└──────┴─────────────────────────────────┘
+**Trade-offs:** Signaling is not included, NAT traversal is complex, TURN relays add cost, and group calls usually need media servers such as an SFU.
 
-Ports 0-1023: Well-known (system) ports
-Ports 1024-49151: Registered ports
-Ports 49152-65535: Dynamic/private ports
-```
+**Good fit:** Video calls, voice calls, screen sharing, peer-to-peer file transfer, and interactive media.
 
-## Socket Programming Basics
+> **Interview guidance:** WebRTC is usually the right answer for voice/video calling, but it is rarely the simplest choice for ordinary collaborative applications.
 
-```
-TCP Server:
-  socket()      → Create socket
-  bind()        → Bind to address/port
-  listen()      → Mark as passive socket
-  accept()      → Block until client connects
-  recv()/send() → Exchange data
-  close()       → Close connection
+### Application Protocol Decision Table
 
-TCP Client:
-  socket()      → Create socket
-  connect()     → Connect to server
-  send()/recv() → Exchange data
-  close()       → Close connection
+| Technology | Communication style | Best suited for |
+|---|---|---|
+| REST | Request-response | Public APIs and standard CRUD |
+| GraphQL | Client-defined queries | Data-rich UIs with varied client needs |
+| gRPC | Typed RPC and streaming | Internal service-to-service calls |
+| SSE | Server-to-client stream | Notifications and live updates |
+| WebSockets | Bidirectional persistent connection | Chat and interactive real-time apps |
+| WebRTC | Peer-to-peer media and data | Voice, video, and low-latency media |
 
-UDP (no connection):
-  socket()        → Create socket
-  bind()          → Bind to address/port (server)
-  recvfrom()      → Receive with sender info
-  sendto()        → Send to specific address
-  close()         → Close socket
+### SSE vs WebSockets vs WebRTC
+
+| Question | SSE | WebSockets | WebRTC |
+|---|---|---|---|
+| Direction | Server to client | Bidirectional | Peer to peer |
+| Main data | Text events | Text or binary messages | Audio, video, or data |
+| Typical transport | HTTP connection | TCP; commonly TLS in production | Primarily UDP, with fallbacks and relays |
+| Built-in reconnection | Browser support | Application-managed | Application-managed |
+| Best example | Live notifications | Chat | Video call |
+
+## Load Balancers
+
+A **load balancer** distributes incoming traffic across multiple healthy backend servers. It improves scalability, availability, and fault tolerance while giving clients one stable endpoint.
+
+```mermaid
+flowchart LR
+    C1["Client 1"] --> LB["Load Balancer"]
+    C2["Client 2"] --> LB
+    C3["Client 3"] --> LB
+    LB --> S1["Server 1"]
+    LB --> S2["Server 2"]
+    LB --> S3["Server 3"]
 ```
 
-## Network Latency Components
+If a server fails a health check, the load balancer temporarily stops sending new traffic to it.
 
-```
-Total Latency = Propagation + Transmission + Queuing + Processing
+### Layer 4 Load Balancer - Transport Layer
 
-1. Propagation Delay
-   Time for signal to travel through medium
-   = Distance / Speed of light in medium
-   Example: 1000 km fiber = ~5ms
+A **Layer 4 load balancer** routes TCP or UDP connections using network and transport information such as source/destination IP addresses and ports. It does not need to understand HTTP paths, headers, or message bodies.
 
-2. Transmission Delay
-   Time to push all bits onto link
-   = Packet size / Bandwidth
-   Example: 1500 bytes on 100 Mbps = 0.12ms
-
-3. Queuing Delay
-   Time waiting in router queues
-   Variable, depends on congestion
-
-4. Processing Delay
-   Time for router to process packet header
-   Usually negligible (~microseconds)
-
-Bandwidth vs Latency:
-- Bandwidth: How much data per second (throughput)
-- Latency: How long for first bit to arrive (delay)
-- High bandwidth doesn't mean low latency!
+```text
+TCP traffic on port 443 -> choose a backend server
+UDP traffic on port 53  -> choose a DNS server
 ```
 
-## TCP Congestion Control
+**Strengths:** Fast, protocol-agnostic, low processing overhead, and useful for both TCP and UDP traffic.
 
-```
-Slow Start → Congestion Avoidance → Fast Retransmit → Fast Recovery
+**Limitations:** Cannot route using URLs, HTTP headers, cookies, or application-specific content.
 
-Congestion Window (cwnd) Growth:
-┌────────────────────────────────────────────┐
-│ Slow Start: Exponential growth             │
-│ cwnd = 1                                   │
-│ After 1 RTT: cwnd = 2                      │
-│ After 2 RTT: cwnd = 4                      │
-│ After 3 RTT: cwnd = 8                      │
-├────────────────────────────────────────────┤
-│ Congestion Avoidance: Linear growth        │
-│ (after reaching ssthresh)                  │
-│ cwnd += 1 per RTT                          │
-├────────────────────────────────────────────┤
-│ Packet Loss Detected:                      │
-│ - 3 duplicate ACKs: Fast Retransmit        │
-│   ssthresh = cwnd/2                        │
-│   cwnd = ssthresh + 3                      │
-│ - Timeout: More severe                     │
-│   ssthresh = cwnd/2                        │
-│   cwnd = 1 (restart slow start)            │
-└────────────────────────────────────────────┘
+**Good fit:** Databases, DNS, game servers, VoIP, raw TCP services, and TLS pass-through.
 
-TCP Variants:
-- TCP Reno: Classic implementation
-- TCP Cubic: Default in Linux (aggressive)
-- TCP BBR: Bottleneck bandwidth-based (Google)
+### Layer 7 Load Balancer - Application Layer
+
+A **Layer 7 load balancer** understands application protocols such as HTTP and HTTPS. It can inspect request information and make content-aware routing decisions.
+
+```text
+/api/*          -> API servers
+/images/*       -> media servers
+Host: admin.com -> admin servers
+Header: beta    -> beta deployment
 ```
 
-## REST API Best Practices
+**Strengths:** Path- and host-based routing, TLS termination, redirects, request rewriting, authentication integration, rate limiting, and observability.
 
-```
-1. Use HTTP Methods Correctly
-   GET    /users        → List users
-   GET    /users/123    → Get user 123
-   POST   /users        → Create user
-   PUT    /users/123    → Update user 123 (full)
-   PATCH  /users/123    → Update user 123 (partial)
-   DELETE /users/123    → Delete user 123
+**Limitations:** More CPU and memory overhead, greater configuration complexity, and usually tied to supported application protocols.
 
-2. Use Plural Nouns for Resources
-   ✓ /users, /orders, /products
-   ✗ /user, /getUsers, /createOrder
+**Good fit:** Websites, REST and GraphQL APIs, microservice gateways, gRPC, WebSockets, and HTTP-based applications.
 
-3. Use Status Codes Correctly
-   200 OK               → Success
-   201 Created          → Resource created
-   204 No Content       → Success, no body
-   400 Bad Request      → Client error
-   401 Unauthorized     → Authentication required
-   403 Forbidden        → No permission
-   404 Not Found        → Resource doesn't exist
-   500 Internal Error   → Server error
+### Layer 4 vs Layer 7
 
-4. Versioning
-   /api/v1/users
-   /api/v2/users
+| Feature | Layer 4 Load Balancer | Layer 7 Load Balancer |
+|---|---|---|
+| OSI layer | Transport | Application |
+| Routes using | IP address, port, TCP/UDP connection | Host, path, method, header, cookie, content |
+| Understands HTTP | No | Yes |
+| Protocol support | Any TCP or UDP protocol | Supported application protocols, commonly HTTP/HTTPS |
+| TLS handling | Commonly passes encrypted traffic through | Commonly terminates TLS to inspect HTTP |
+| Performance | Lower processing overhead | More processing for content-aware routing |
+| Routing flexibility | Basic | Advanced |
+| Example decision | Send port `443` traffic to a server | Send `/payments` to the payment service |
 
-5. Filtering, Sorting, Pagination
-   GET /users?status=active&sort=created_at&page=2&limit=20
+### Which One Should You Choose?
 
-6. Use HATEOAS (Hypermedia)
-   Include links to related resources in response
+- Choose **Layer 4** when you need high-throughput connection distribution, UDP support, TLS pass-through, or a non-HTTP protocol.
+- Choose **Layer 7** when routing depends on the hostname, URL, headers, cookies, or other application data.
+- Large systems may use both: a Layer 4 load balancer at the network edge and Layer 7 load balancers or gateways behind it.
 
-7. Security
-   - Use HTTPS
-   - Authentication (JWT, OAuth)
-   - Rate limiting
-   - Input validation
-```
+### Important Load-Balancing Concepts
 
-## Design Questions Involving Networking
+| Concept | Meaning |
+|---|---|
+| Health checks | Remove unhealthy instances from traffic rotation |
+| Round robin | Send requests to servers in sequence |
+| Least connections | Prefer the server with the fewest active connections |
+| Weighted routing | Send more traffic to higher-capacity servers |
+| Consistent hashing | Map a key or client to a stable backend with limited remapping |
+| Sticky sessions | Keep a client on one backend; useful sometimes, but adds state and hurts even distribution |
+| TLS termination | Decrypt HTTPS at the load balancer and optionally re-encrypt traffic to backends |
 
-### 1. Design a URL Shortener
-* **Concepts**: HTTP redirects (301/302), DNS, load balancing
-* **Key Points**: Hash collision handling, redirect types, caching
+> **Interview focus:** Start by saying what information the load balancer must inspect. IP and port suggest Layer 4; host, path, headers, or cookies require Layer 7.
 
-### 2. Design Netflix/Video Streaming
-* **Concepts**: CDN, adaptive bitrate, TCP vs UDP
-* **Key Points**: HLS/DASH protocols, buffering, P2P for live
+## Interview Revision Checklist
 
-### 3. Design WhatsApp/Chat Application
-* **Concepts**: WebSocket, long polling, message queues
-* **Key Points**: Bidirectional communication, offline messages, push notifications
+Be ready to answer these questions:
 
-### 4. Design API Gateway
-* **Concepts**: Reverse proxy, load balancing, rate limiting
-* **Key Points**: Request routing, authentication, circuit breaker
+1. What does each OSI layer do?
+2. What is the difference between a private and public IP?
+3. How does NAT allow many private devices to share one public IP?
+4. What happens during a DNS lookup?
+5. Why does TCP need a three-way handshake?
+6. Why can TCP teardown use four messages?
+7. What do sequence numbers, acknowledgements, flow control, and congestion control solve?
+8. When is packet loss preferable to retransmission?
+9. Why can HTTP/3 use UDP and still provide reliable delivery?
+10. When would you choose REST, GraphQL, gRPC, SSE, WebSockets, or WebRTC?
 
-### 5. Design CDN
-* **Concepts**: DNS, caching, anycast
-* **Key Points**: Cache invalidation, geo-routing, origin shield
-
-### 6. Design Web Crawler
-* **Concepts**: HTTP, robots.txt, DNS, politeness
-* **Key Points**: Distributed crawling, URL frontier, duplicate detection
-
-### 7. Design Load Balancer
-* **Concepts**: Layer 4 vs Layer 7, health checks, algorithms
-* **Key Points**: Session persistence, SSL termination, failover
-
-### 8. Design Real-time Gaming Backend
-* **Concepts**: UDP for game state, TCP for chat, latency optimization
-* **Key Points**: Client-side prediction, lag compensation, dedicated servers vs P2P
-
-### 9. Design VPN Service
-* **Concepts**: Tunneling, encryption (IPSec, WireGuard), NAT
-* **Key Points**: Split tunneling, kill switch, server selection
-
-### 10. Design Email Service
-* **Concepts**: SMTP, IMAP, POP3, SPF/DKIM/DMARC
-* **Key Points**: Spam filtering, attachment handling, encryption
-
-## Network Troubleshooting Commands
-
-```
-ping         → Test reachability, measure RTT
-traceroute   → Show path packets take
-nslookup/dig → DNS queries
-netstat      → Network connections, routing table
-ifconfig/ip  → Network interface configuration
-tcpdump      → Packet capture and analysis
-wireshark    → GUI packet analyzer
-curl         → HTTP client for testing APIs
-telnet       → Test port connectivity
-ss           → Socket statistics (modern netstat)
-mtr          → Continuous ping + traceroute
-iperf        → Network bandwidth testing
-```
-
-## Common Network Issues
-
-**High Latency:**
-* Cause: Geographic distance, routing, congestion
-* Debug: ping, traceroute, mtr
-* Solution: CDN, better routing, caching
-
-**Packet Loss:**
-* Cause: Congestion, faulty hardware, wireless interference
-* Debug: ping with packet loss %, mtr
-* Solution: QoS, better hardware, wired connection
-
-**DNS Issues:**
-* Cause: DNS server down, misconfiguration, cache poisoning
-* Debug: nslookup, dig, check /etc/resolv.conf
-* Solution: Alternate DNS (8.8.8.8), flush cache
-
-**Connection Timeout:**
-* Cause: Firewall, server down, wrong port
-* Debug: telnet, nc (netcat), check firewall rules
-* Solution: Open ports, check server status
-
-**SSL/TLS Errors:**
-* Cause: Certificate expired, wrong hostname, untrusted CA
-* Debug: openssl s_client, check certificate chain
-* Solution: Renew cert, fix hostname, add CA to trust store
-
-## Performance Optimization
-
-**Reduce Latency:**
-* Use CDN (geographically closer)
-* Connection pooling (reuse TCP connections)
-* HTTP/2 or HTTP/3 (multiplexing)
-* Reduce DNS lookups (DNS prefetch)
-* Use TCP Fast Open
-
-**Increase Throughput:**
-* Compression (gzip, brotli)
-* Minification (JS, CSS)
-* Image optimization
-* Caching (browser, CDN, server)
-* Parallel connections (domain sharding for HTTP/1.1)
-
-**Optimize API Calls:**
-* Batching requests
-* GraphQL (fetch only needed fields)
-* Pagination (don't fetch all data)
-* Caching (Redis, CDN)
-* Rate limiting (prevent abuse)
-
-## Security Concepts
-
-**DDoS Protection:**
-* Rate limiting per IP
-* Anycast routing (distribute load)
-* Challenge-response (CAPTCHA)
-* Blackholing (drop traffic)
-* CDN with DDoS protection (Cloudflare, Akamai)
-
-**Man-in-the-Middle (MITM):**
-* Use HTTPS/TLS (encryption)
-* Certificate pinning
-* HSTS (HTTP Strict Transport Security)
-* Avoid public WiFi or use VPN
-
-**SQL Injection:**
-* Parameterized queries (prepared statements)
-* Input validation
-* Least privilege database user
-* Web Application Firewall (WAF)
-
-**XSS (Cross-Site Scripting):**
-* Output encoding
-* Content Security Policy (CSP)
-* HttpOnly cookies
-* Input sanitization
-
-## Key Formulas
-
-**Bandwidth-Delay Product:** `BDP = Bandwidth * RTT`
-* Amount of data "in flight" on network
-
-**Throughput:** `Throughput ≤ Window Size / RTT`
-* Max throughput limited by TCP window and RTT
-
-**Utilization:** `U = L / (L + RTT * Bandwidth)`
-* Where L = packet size
-
-**DNS Query Time:** `Total = Recursive lookups * RTT per lookup`
-
-**HTTP Response Time:** `Total = DNS + TCP + TLS + Request + Server + Response`
+> **One-line summary:** IP gets packets to the correct machine, TCP or UDP gets data to the correct process, and application protocols define what that data means.
