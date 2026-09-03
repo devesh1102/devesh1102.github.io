@@ -32,6 +32,28 @@ Numbers are rule-of-thumb — real benchmarks vary by workload, language, and tu
 | DynamoDB | ~3K (default) | ~1K (default) | Provisioned throughput, scales with $$$ |
 | Elasticsearch (single node) | ~1K–5K | ~500–2K | Search-optimized, indexing is expensive |
 
+#### Numbers to Know
+
+| Metric | Rule of thumb |
+|---|---|
+| Storage | Up to 64 TiB for most single database instances; Aurora supports up to 256 TiB |
+| Read latency | ~1–5 ms for cached data and ~5–30 ms for disk reads on optimized RDS or Aurora configurations |
+| Write latency | ~5–15 ms commit latency for high-performance, single-node setups |
+| Read throughput | Up to ~50K TPS in high-performance, single-node Aurora or RDS configurations |
+| Write throughput | ~10K–20K TPS in high-performance, single-node Aurora or RDS configurations |
+| Connections | ~5K–20K concurrent connections, depending on the database and instance type; connection pooling is usually recommended |
+
+#### When to Consider Sharding
+
+- **Dataset size:** approaching or exceeding 50 TiB.
+- **Write throughput:** consistently exceeding 10K TPS.
+- **Read latency:** uncached-data requirements below 5 ms that cannot be met
+  through indexing, query optimization, caching, or read replicas.
+- **Geographic distribution:** the workload requires cross-region replication
+  or data placement close to users.
+- **Backup and recovery:** backup or restore windows take hours and become
+  operationally impractical.
+
 ### Cache (Redis)
 
 | Operation | Throughput |
@@ -39,6 +61,23 @@ Numbers are rule-of-thumb — real benchmarks vary by workload, language, and tu
 | GET / SET | 100K–500K ops/sec per node |
 | GEORADIUS | ~50K–100K ops/sec |
 | Sorted set ops | ~50K–100K ops/sec |
+
+#### Numbers to Know
+
+| Metric | Rule of thumb |
+|---|---|
+| Memory | Up to ~1 TB on memory-optimized instances; specialized configurations can exceed this |
+| Read latency | <1 ms within the same region |
+| Write latency | <1 ms in the same availability zone; ~1–2 ms across availability zones in the same region for optimized systems |
+| Throughput | ~100K–200K+ simple operations/sec per instance for modern in-memory caches such as ElastiCache for Redis on Graviton-based nodes; simple reads and writes have roughly comparable throughput |
+
+#### When to Consider Scaling
+
+- **Dataset size:** approaching 1 TB. In practice, shard earlier to preserve
+  memory headroom, reduce failover time, and avoid relying on one very large
+  node.
+- **Throughput:** sustained traffic above 100K operations/sec.
+- **Read latency:** the application consistently requires latency below 0.5 ms.
 
 ### Message Brokers
 
